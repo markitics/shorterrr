@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/react-auth";
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
+import { analyze } from "@/lib/hemingway";
 import type { MppChallenge } from "@/lib/mpp";
+import type { HemingwayResult, SentenceAnalysis } from "@/lib/hemingway";
 
 type Mode = "shorter" | "joe" | "riddle" | "hemingway";
 
@@ -34,16 +36,177 @@ const MODE_CONFIG: Record<
   },
   hemingway: {
     label: "Hemingway",
-    description: "Writing feedback using hard-coded readability rules — always free",
-    buttonText: "Get Hemingway's take",
+    description: "Writing feedback using hard-coded readability rules — always free, no API",
+    buttonText: "Analyze",
     resultLabel: "Hemingway's feedback:",
     color: "blue",
   },
 };
 
+/* ------------------------------------------------------------------ */
+/*  Hemingway result display component                                 */
+/* ------------------------------------------------------------------ */
+
+function HemingwayDisplay({ result }: { result: HemingwayResult }) {
+  const { grade, stats, sentences, summary } = result;
+
+  const gradeLabel =
+    grade <= 6 ? "Good" : grade <= 10 ? "OK" : grade <= 14 ? "Poor" : "Very Poor";
+  const gradeColor =
+    grade <= 6
+      ? "text-emerald-600"
+      : grade <= 10
+      ? "text-amber-600"
+      : "text-red-600";
+
+  return (
+    <div className="space-y-6">
+      {/* Stats bar */}
+      <div className="flex flex-wrap gap-4">
+        <div className="rounded-lg border border-blue-200 bg-white px-4 py-3 text-center min-w-[100px]">
+          <div className={`text-2xl font-bold ${gradeColor}`}>Grade {grade}</div>
+          <div className="text-xs text-zinc-500">{gradeLabel}</div>
+        </div>
+        <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center min-w-[80px]">
+          <div className="text-2xl font-bold text-zinc-800">{stats.words}</div>
+          <div className="text-xs text-zinc-500">Words</div>
+        </div>
+        <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center min-w-[80px]">
+          <div className="text-2xl font-bold text-zinc-800">{stats.sentences}</div>
+          <div className="text-xs text-zinc-500">Sentences</div>
+        </div>
+      </div>
+
+      {/* Issue summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {summary.veryHardSentences > 0 && (
+          <div className="rounded-lg bg-red-100 border border-red-200 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-red-700">{summary.veryHardSentences}</div>
+            <div className="text-xs text-red-600">very hard to read</div>
+          </div>
+        )}
+        {summary.hardSentences > 0 && (
+          <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-amber-700">{summary.hardSentences}</div>
+            <div className="text-xs text-amber-600">hard to read</div>
+          </div>
+        )}
+        {summary.adverbs > 0 && (
+          <div className="rounded-lg bg-blue-100 border border-blue-200 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-blue-700">{summary.adverbs}</div>
+            <div className="text-xs text-blue-600">adverb{summary.adverbs !== 1 ? "s" : ""}</div>
+          </div>
+        )}
+        {summary.passiveVoice > 0 && (
+          <div className="rounded-lg bg-green-100 border border-green-200 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-green-700">{summary.passiveVoice}</div>
+            <div className="text-xs text-green-600">passive voice</div>
+          </div>
+        )}
+        {summary.complexWords > 0 && (
+          <div className="rounded-lg bg-purple-100 border border-purple-200 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-purple-700">{summary.complexWords}</div>
+            <div className="text-xs text-purple-600">simpler alternative{summary.complexWords !== 1 ? "s" : ""}</div>
+          </div>
+        )}
+        {summary.veryHardSentences === 0 &&
+          summary.hardSentences === 0 &&
+          summary.adverbs === 0 &&
+          summary.passiveVoice === 0 &&
+          summary.complexWords === 0 && (
+            <div className="col-span-full rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 text-center">
+              <div className="text-sm font-semibold text-emerald-700">Looking good! No major issues found.</div>
+            </div>
+          )}
+      </div>
+
+      {/* Highlighted text */}
+      <div className="rounded-lg bg-white border border-blue-100 px-5 py-4 text-base leading-relaxed">
+        {sentences.map((s: SentenceAnalysis, i: number) => (
+          <SentenceSpan key={i} sentence={s} />
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded bg-red-200" /> Very hard sentence
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded bg-amber-200" /> Hard sentence
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-blue-300" /> Adverb
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-green-300" /> Passive voice
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-3 h-3 rounded-full bg-purple-300" /> Simpler alternative
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
+  const bgClass =
+    sentence.level === "very-hard"
+      ? "bg-red-200"
+      : sentence.level === "hard"
+      ? "bg-amber-200"
+      : "";
+
+  // Build highlighted text with inline issue markers
+  const words = sentence.text.split(/(\s+)/);
+  const issueMap = new Map<string, SentenceAnalysis["issues"][0]>();
+  for (const issue of sentence.issues) {
+    issueMap.set(issue.word.toLowerCase(), issue);
+  }
+
+  return (
+    <span className={`${bgClass} rounded-sm`}>
+      {words.map((w, i) => {
+        const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
+        const issue = issueMap.get(clean);
+        if (issue) {
+          const color =
+            issue.type === "adverb"
+              ? "bg-blue-200 underline decoration-blue-400"
+              : issue.type === "passive"
+              ? "bg-green-200 underline decoration-green-400"
+              : "bg-purple-200 underline decoration-purple-400";
+          return (
+            <span
+              key={i}
+              className={`${color} rounded-sm cursor-help`}
+              title={
+                issue.type === "complex"
+                  ? `Try "${issue.suggestion}" instead`
+                  : issue.type === "adverb"
+                  ? "Consider removing this adverb"
+                  : "Consider using active voice"
+              }
+            >
+              {w}
+            </span>
+          );
+        }
+        return <span key={i}>{w}</span>;
+      })}
+      {" "}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main page                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function Home() {
   const [draft, setDraft] = useState("");
   const [shortened, setShortened] = useState("");
+  const [hemingwayResult, setHemingwayResult] = useState<HemingwayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasShouted, setHasShouted] = useState(false);
@@ -56,7 +219,7 @@ export default function Home() {
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
 
   const config = MODE_CONFIG[mode];
-  const c = config.color; // shorthand for color classes
+  const c = config.color;
 
   async function callApi(mppCredential?: string) {
     const res = await fetch("/api/shorten", {
@@ -67,7 +230,6 @@ export default function Home() {
 
     const data = await res.json();
 
-    // Handle 402 - payment required
     if (res.status === 402 && data.paymentRequired) {
       const challenge = parseChallenge(data.challenge);
       if (challenge) {
@@ -92,9 +254,18 @@ export default function Home() {
     setLoading(true);
     setError("");
     setShortened("");
+    setHemingwayResult(null);
     setHasShouted(true);
     setPendingChallenge(null);
     setPaymentStatus("");
+
+    // Hemingway mode: client-side only, no API call
+    if (mode === "hemingway") {
+      const result = analyze(draft);
+      setHemingwayResult(result);
+      setLoading(false);
+      return;
+    }
 
     try {
       const data = await callApi();
@@ -115,9 +286,6 @@ export default function Home() {
     setPaymentStatus("Processing payment...");
 
     try {
-      // Build the credential with the challenge info
-      // For now, we create a credential structure that the server will forward
-      // The actual payment method depends on what teenytiny.ai supports
       const credential = encodeCredential({
         challenge: pendingChallenge.raw,
         payload: {
@@ -146,6 +314,7 @@ export default function Home() {
   function handleReset() {
     setDraft("");
     setShortened("");
+    setHemingwayResult(null);
     setError("");
     setHasShouted(false);
     setPendingChallenge(null);
@@ -208,13 +377,14 @@ export default function Home() {
       {/* Main */}
       <main className="w-full max-w-3xl px-6 py-10 flex flex-col gap-8">
         {/* Mode toggle */}
-        <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 self-start">
+        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-zinc-100 p-1 self-start">
           {(Object.keys(MODE_CONFIG) as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => {
                 setMode(m);
                 setShortened("");
+                setHemingwayResult(null);
                 setError("");
                 setHasShouted(false);
                 setPendingChallenge(null);
@@ -255,7 +425,7 @@ export default function Home() {
               {wordCount} word{wordCount !== 1 ? "s" : ""}
             </span>
             <div className="flex gap-3">
-              {(draft || shortened) && (
+              {(draft || shortened || hemingwayResult) && (
                 <button
                   onClick={handleReset}
                   className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
@@ -345,8 +515,15 @@ export default function Home() {
           </div>
         )}
 
-        {/* Result */}
-        {shortened && (
+        {/* Hemingway result (client-side analysis) */}
+        {hemingwayResult && mode === "hemingway" && (
+          <section className="rounded-xl border border-blue-200 bg-blue-50 p-6">
+            <HemingwayDisplay result={hemingwayResult} />
+          </section>
+        )}
+
+        {/* Result for non-hemingway modes */}
+        {shortened && mode !== "hemingway" && (
           <section
             className={`rounded-xl border p-6 ${
               ({
@@ -433,13 +610,13 @@ export default function Home() {
               },
               {
                 step: "2",
-                title: "We shout SHORTER!",
-                desc: "Because it's always too long. Always.",
+                title: "Pick a mode",
+                desc: "Shorter, Joe, Riddles, or Hemingway — each gives different feedback.",
               },
               {
                 step: "3",
-                title: "Get a tighter version",
-                desc: "Copy the shorter message and send it. You're welcome.",
+                title: "Get feedback",
+                desc: "Copy the result and send a better message. You're welcome.",
               },
             ].map((item) => (
               <div

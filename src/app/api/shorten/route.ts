@@ -244,8 +244,11 @@ export async function POST(req: NextRequest) {
     case "riddle":
       return handleRiddleMode(message, mppCredential);
     case "hemingway":
-      // Will be replaced with client-side analysis in Milestone 3
-      return handleShorterMode(message, mppCredential);
+      // Hemingway mode is client-side only — no API needed
+      return NextResponse.json(
+        { error: "Hemingway analysis runs client-side. No API call needed." },
+        { status: 400 }
+      );
     default:
       return handleShorterMode(message, mppCredential);
   }
