@@ -2,12 +2,38 @@
 
 import { useState } from "react";
 
+type Mode = "shorter" | "joe" | "hemingway";
+
+const MODE_CONFIG: Record<Mode, { label: string; description: string; buttonText: string; resultLabel: string }> = {
+  shorter: {
+    label: "Shorterrr!",
+    description: "Rewrites your message to be dramatically shorter",
+    buttonText: "Make it shorter!",
+    resultLabel: "Here's a shorter version you can send instead:",
+  },
+  joe: {
+    label: "Tips from Joe",
+    description: "Joe always has the same advice...",
+    buttonText: "Ask Joe",
+    resultLabel: "Joe says:",
+  },
+  hemingway: {
+    label: "Tips from Hemingway",
+    description: "Writing feedback inspired by Hemingway's principles",
+    buttonText: "Get Hemingway's take",
+    resultLabel: "Hemingway's feedback:",
+  },
+};
+
 export default function Home() {
   const [draft, setDraft] = useState("");
   const [shortened, setShortened] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasShouted, setHasShouted] = useState(false);
+  const [mode, setMode] = useState<Mode>("shorter");
+
+  const config = MODE_CONFIG[mode];
 
   async function handleShorten() {
     if (!draft.trim()) return;
@@ -21,7 +47,7 @@ export default function Home() {
       const res = await fetch("/api/shorten", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: draft }),
+        body: JSON.stringify({ message: draft, mode }),
       });
 
       const data = await res.json();
@@ -63,7 +89,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold tracking-tight">
             Shorterrr<span className="text-red-500">!</span>
           </h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-500 hidden sm:block">
             Messages to your manager, made shorter.
           </p>
         </div>
@@ -71,6 +97,30 @@ export default function Home() {
 
       {/* Main */}
       <main className="w-full max-w-3xl px-6 py-10 flex flex-col gap-8">
+        {/* Mode toggle */}
+        <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 self-start">
+          {(Object.keys(MODE_CONFIG) as Mode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m);
+                setShortened("");
+                setError("");
+                setHasShouted(false);
+              }}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                mode === m
+                  ? "bg-white text-zinc-900 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-700"
+              }`}
+            >
+              {MODE_CONFIG[m].label}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-zinc-400 -mt-4">{config.description}</p>
+
         {/* Input section */}
         <section>
           <label
@@ -83,7 +133,7 @@ export default function Home() {
             id="draft"
             rows={8}
             className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200 resize-y"
-            placeholder="Paste your message here... e.g. &quot;Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should...&quot;"
+            placeholder='Paste your message here... e.g. "Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should..."'
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={loading}
@@ -106,7 +156,7 @@ export default function Home() {
                 disabled={!draft.trim() || loading}
                 className="rounded-lg bg-red-500 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                {loading ? "Shortening..." : "Make it shorter!"}
+                {loading ? "Working..." : config.buttonText}
               </button>
             </div>
           </div>
@@ -114,13 +164,17 @@ export default function Home() {
 
         {/* SHORTER! shout */}
         {hasShouted && (
-          <div className="flex flex-col items-center gap-2 animate-bounce-once">
+          <div className="flex flex-col items-center gap-2">
             <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
-              SHORTER!
+              {mode === "joe" ? "JOE SAYS:" : mode === "hemingway" ? "HEMINGWAY SAYS:" : "SHORTER!"}
             </div>
             {loading && (
               <p className="text-sm text-zinc-500 animate-pulse">
-                Rewriting your message...
+                {mode === "joe"
+                  ? "Consulting Joe..."
+                  : mode === "hemingway"
+                  ? "Channeling Hemingway..."
+                  : "Rewriting your message..."}
               </p>
             )}
           </div>
@@ -135,38 +189,73 @@ export default function Home() {
 
         {/* Result */}
         {shortened && (
-          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
+          <section
+            className={`rounded-xl border p-6 ${
+              mode === "joe"
+                ? "border-amber-200 bg-amber-50"
+                : mode === "hemingway"
+                ? "border-blue-200 bg-blue-50"
+                : "border-emerald-200 bg-emerald-50"
+            }`}
+          >
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-emerald-800">
-                Here&apos;s a shorter version you can send instead:
+              <h2
+                className={`text-sm font-semibold ${
+                  mode === "joe"
+                    ? "text-amber-800"
+                    : mode === "hemingway"
+                    ? "text-blue-800"
+                    : "text-emerald-800"
+                }`}
+              >
+                {config.resultLabel}
               </h2>
-              <span className="text-xs text-emerald-600">
-                {shortenedWordCount} word{shortenedWordCount !== 1 ? "s" : ""}{" "}
-                ({wordCount > 0
-                  ? Math.round(
-                      ((wordCount - shortenedWordCount) / wordCount) * 100
-                    )
-                  : 0}
-                % shorter)
-              </span>
+              {mode === "shorter" && (
+                <span className="text-xs text-emerald-600">
+                  {shortenedWordCount} word
+                  {shortenedWordCount !== 1 ? "s" : ""} (
+                  {wordCount > 0
+                    ? Math.round(
+                        ((wordCount - shortenedWordCount) / wordCount) * 100
+                      )
+                    : 0}
+                  % shorter)
+                </span>
+              )}
             </div>
-            <div className="rounded-lg bg-white border border-emerald-100 px-4 py-3 text-base text-zinc-900 whitespace-pre-wrap">
+            <div
+              className={`rounded-lg bg-white border px-4 py-3 text-base text-zinc-900 whitespace-pre-wrap ${
+                mode === "joe"
+                  ? "border-amber-100"
+                  : mode === "hemingway"
+                  ? "border-blue-100"
+                  : "border-emerald-100"
+              }`}
+            >
               {shortened}
             </div>
             <div className="mt-4 flex gap-3">
               <button
                 onClick={handleCopy}
-                className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
+                  mode === "joe"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : mode === "hemingway"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
               >
                 Copy to clipboard
               </button>
-              <button
-                onClick={handleShorten}
-                disabled={loading}
-                className="rounded-lg border border-emerald-300 px-5 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-              >
-                Even shorter!
-              </button>
+              {mode === "shorter" && (
+                <button
+                  onClick={handleShorten}
+                  disabled={loading}
+                  className="rounded-lg border border-emerald-300 px-5 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                  Even shorter!
+                </button>
+              )}
             </div>
           </section>
         )}
