@@ -165,10 +165,14 @@ export default function Home() {
             )}
             {ready && authenticated && (
               <div className="flex items-center gap-2">
-                {embeddedWallet && (
-                  <span className="text-xs text-zinc-400 font-mono hidden sm:inline">
-                    {embeddedWallet.address.slice(0, 6)}...
+                {embeddedWallet ? (
+                  <span className="text-xs text-emerald-600 font-mono hidden sm:inline">
+                    Wallet: {embeddedWallet.address.slice(0, 6)}...
                     {embeddedWallet.address.slice(-4)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-amber-500 animate-pulse">
+                    Creating wallet...
                   </span>
                 )}
                 <span className="text-xs text-zinc-500">
