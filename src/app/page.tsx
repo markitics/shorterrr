@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/react-auth";
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
 import type { MppChallenge } from "@/lib/mpp";
 
@@ -42,8 +42,8 @@ export default function Home() {
   const [paymentStatus, setPaymentStatus] = useState<string>("");
 
   const { login, ready, authenticated, user, logout } = usePrivy();
-  const { wallets } = useWallets();
-  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
+  const { wallets, ready: walletsReady } = useWallets();
+  const embeddedWallet = getEmbeddedConnectedWallet(wallets);
 
   const config = MODE_CONFIG[mode];
 
@@ -169,6 +169,10 @@ export default function Home() {
                   <span className="text-xs text-emerald-600 font-mono hidden sm:inline">
                     Wallet: {embeddedWallet.address.slice(0, 6)}...
                     {embeddedWallet.address.slice(-4)}
+                  </span>
+                ) : !walletsReady ? (
+                  <span className="text-xs text-zinc-400 animate-pulse">
+                    Loading...
                   </span>
                 ) : (
                   <span className="text-xs text-amber-500 animate-pulse">
@@ -299,9 +303,13 @@ export default function Home() {
               >
                 Sign in to pay
               </button>
+            ) : !walletsReady ? (
+              <p className="text-sm text-violet-600 animate-pulse">
+                Loading wallet...
+              </p>
             ) : !embeddedWallet ? (
               <p className="text-sm text-violet-600">
-                Setting up your wallet...
+                Wallet not found. Try signing out and back in.
               </p>
             ) : (
               <button
