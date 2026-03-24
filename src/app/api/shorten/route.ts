@@ -1,38 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SYSTEM_PROMPTS: Record<string, string> = {
-  shorter: `You are "Shorterrr!", a writing assistant that helps people write shorter messages to their manager.
-Your job: take the user's draft message and rewrite it to be dramatically shorter while keeping the key information.
-Rules:
-- Cut the word count by at least 50%
-- Keep the tone professional but direct
-- Preserve all critical information (dates, numbers, action items)
-- Remove filler words, unnecessary context, and over-explanation
-- Return ONLY the shortened message, nothing else`,
+/**
+ * Build the full prompt for teenytiny.ai's eliza model.
+ *
+ * The eliza model ignores system prompts, so we embed all instructions
+ * directly in the user message as a single combined prompt.
+ */
+function buildPrompt(message: string, mode: string): string {
+  if (mode === "hemingway") {
+    return `You are a writing coach inspired by Hemingway's principles. Your task is to analyze the message below and give brief, actionable feedback.
 
-  joe: `You are "Joe", a gruff but lovable writing coach. No matter what the user writes, you ALWAYS say the same thing. Your response must ALWAYS be exactly:
-
-"You need to make that way shorter."
-
-That's it. Never say anything else. Never vary the response. Always those exact words.`,
-
-  hemingway: `You are a writing coach inspired by Hemingway's principles. Analyze the user's message and give brief, actionable feedback. Check for:
-- Sentences that are too long (flag any over 20 words)
-- Passive voice (suggest active alternatives)
+Check for these issues:
+- Sentences that are too long (flag any sentence over 20 words)
+- Passive voice (suggest active voice alternatives)
 - Adverbs that weaken the writing (suggest removing them)
-- Unnecessarily complex words (suggest simpler ones)
+- Unnecessarily complex words (suggest simpler alternatives)
 - Filler phrases that add no meaning
 
-Format your response as:
-1. A short overall assessment (one sentence)
-2. Specific issues found, each as a bullet point with the problem and fix
-3. A rewritten version applying all fixes
+Format your response EXACTLY like this:
+1. A one-sentence overall assessment
+2. Bullet points listing each specific issue with the problem and suggested fix
+3. A rewritten version of the message with all fixes applied
 
-Be direct and concise, like Hemingway himself.`,
-};
+Be direct and concise. Here is the message to review:
+
+---
+${message}
+---
+
+Now provide your Hemingway-style writing feedback:`;
+  }
+
+  // Default "shorter" mode
+  return `You are a writing assistant called "Shorterrr!" that rewrites messages to be dramatically shorter.
+
+Your task: rewrite the message below to be at least 50% shorter while keeping all critical information (dates, numbers, action items). Remove filler words, unnecessary context, and over-explanation. Keep the tone professional but direct.
+
+IMPORTANT: Reply with ONLY the shortened message. No explanations, no preamble, no "Here's a shorter version" — just the rewritten message itself.
+
+Here is the message to shorten:
+
+---
+${message}
+---
+
+Shortened version:`;
+}
 
 export async function POST(req: NextRequest) {
-  const { message, mode = "shorter" } = await req.json();
+  const { message, mode = "shorter", mppCredential } = await req.json();
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json(
@@ -41,45 +57,60 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Joe mode doesn't need an API call - it always says the same thing
+  // Joe mode doesn't need an API call — it ALWAYS says the same thing
   if (mode === "joe") {
     return NextResponse.json({
       shortened: "You need to make that way shorter.",
     });
   }
 
-  const apiKey = process.env.TEENYTINY_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Server misconfiguration: missing API key." },
-      { status: 500 }
-    );
-  }
+  const prompt = buildPrompt(message, mode);
 
-  const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.shorter;
-  const userPrompt =
-    mode === "hemingway"
-      ? `Review this message:\n\n${message}`
-      : `Make this message shorter:\n\n${message}`;
+  // Build headers — either API key auth or MPP credential
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (mppCredential) {
+    headers["Authorization"] = mppCredential;
+  } else {
+    const apiKey = process.env.TEENYTINY_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: "Server misconfiguration: missing API key." },
+        { status: 500 }
+      );
+    }
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
 
   try {
     const response = await fetch(
       "https://teenytiny.ai/v1/chat/completions",
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: "eliza",
           messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
+            { role: "user", content: prompt },
           ],
         }),
       }
     );
+
+    // If we get a 402, pass the challenge back to the client
+    if (response.status === 402) {
+      const wwwAuth = response.headers.get("WWW-Authenticate") || "";
+      return NextResponse.json(
+        {
+          error: "Payment required",
+          paymentRequired: true,
+          challenge: wwwAuth,
+        },
+        { status: 402 }
+      );
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -94,7 +125,9 @@ export async function POST(req: NextRequest) {
     const shortened =
       data.choices?.[0]?.message?.content ?? "Could not process the message.";
 
-    return NextResponse.json({ shortened });
+    const receipt = response.headers.get("Payment-Receipt");
+
+    return NextResponse.json({ shortened, receipt });
   } catch (error) {
     console.error("Error calling TeenyTiny API:", error);
     return NextResponse.json(

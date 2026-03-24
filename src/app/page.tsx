@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
+import type { MppChallenge } from "@/lib/mpp";
 
 type Mode = "shorter" | "joe" | "hemingway";
 
-const MODE_CONFIG: Record<Mode, { label: string; description: string; buttonText: string; resultLabel: string }> = {
+const MODE_CONFIG: Record<
+  Mode,
+  { label: string; description: string; buttonText: string; resultLabel: string }
+> = {
   shorter: {
     label: "Shorterrr!",
     description: "Rewrites your message to be dramatically shorter",
@@ -32,8 +38,42 @@ export default function Home() {
   const [error, setError] = useState("");
   const [hasShouted, setHasShouted] = useState(false);
   const [mode, setMode] = useState<Mode>("shorter");
+  const [pendingChallenge, setPendingChallenge] = useState<MppChallenge | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<string>("");
+
+  const { login, ready, authenticated, user, logout } = usePrivy();
+  const { wallets } = useWallets();
+  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
 
   const config = MODE_CONFIG[mode];
+
+  async function callApi(mppCredential?: string) {
+    const res = await fetch("/api/shorten", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: draft, mode, mppCredential }),
+    });
+
+    const data = await res.json();
+
+    // Handle 402 - payment required
+    if (res.status === 402 && data.paymentRequired) {
+      const challenge = parseChallenge(data.challenge);
+      if (challenge) {
+        setPendingChallenge(challenge);
+        setPaymentStatus(
+          `Payment required: ${formatAmount(challenge.request.amount, challenge.request.currency)} via ${challenge.method}`
+        );
+        return null;
+      }
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || "Something went wrong.");
+    }
+
+    return data;
+  }
 
   async function handleShorten() {
     if (!draft.trim()) return;
@@ -42,24 +82,47 @@ export default function Home() {
     setError("");
     setShortened("");
     setHasShouted(true);
+    setPendingChallenge(null);
+    setPaymentStatus("");
 
     try {
-      const res = await fetch("/api/shorten", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: draft, mode }),
+      const data = await callApi();
+      if (data) {
+        setShortened(data.shortened);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePayAndRetry() {
+    if (!pendingChallenge || !embeddedWallet) return;
+
+    setLoading(true);
+    setPaymentStatus("Processing payment...");
+
+    try {
+      // Build the credential with the challenge info
+      // For now, we create a credential structure that the server will forward
+      // The actual payment method depends on what teenytiny.ai supports
+      const credential = encodeCredential({
+        challenge: pendingChallenge.raw,
+        payload: {
+          walletAddress: embeddedWallet.address,
+          method: pendingChallenge.method,
+        },
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Something went wrong.");
-        return;
+      const data = await callApi(credential);
+      if (data) {
+        setShortened(data.shortened);
+        setPendingChallenge(null);
+        setPaymentStatus(data.receipt ? "Payment confirmed" : "");
       }
-
-      setShortened(data.shortened);
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Payment failed.");
     } finally {
       setLoading(false);
     }
@@ -74,6 +137,8 @@ export default function Home() {
     setShortened("");
     setError("");
     setHasShouted(false);
+    setPendingChallenge(null);
+    setPaymentStatus("");
   }
 
   const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0;
@@ -89,9 +154,35 @@ export default function Home() {
           <h1 className="text-2xl font-bold tracking-tight">
             Shorterrr<span className="text-red-500">!</span>
           </h1>
-          <p className="text-sm text-zinc-500 hidden sm:block">
-            Messages to your manager, made shorter.
-          </p>
+          <div className="flex items-center gap-3">
+            {ready && !authenticated && (
+              <button
+                onClick={login}
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                Sign in
+              </button>
+            )}
+            {ready && authenticated && (
+              <div className="flex items-center gap-2">
+                {embeddedWallet && (
+                  <span className="text-xs text-zinc-400 font-mono hidden sm:inline">
+                    {embeddedWallet.address.slice(0, 6)}...
+                    {embeddedWallet.address.slice(-4)}
+                  </span>
+                )}
+                <span className="text-xs text-zinc-500">
+                  {user?.email?.address || "Connected"}
+                </span>
+                <button
+                  onClick={logout}
+                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -107,6 +198,8 @@ export default function Home() {
                 setShortened("");
                 setError("");
                 setHasShouted(false);
+                setPendingChallenge(null);
+                setPaymentStatus("");
               }}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 mode === m
@@ -166,7 +259,11 @@ export default function Home() {
         {hasShouted && (
           <div className="flex flex-col items-center gap-2">
             <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
-              {mode === "joe" ? "JOE SAYS:" : mode === "hemingway" ? "HEMINGWAY SAYS:" : "SHORTER!"}
+              {mode === "joe"
+                ? "JOE SAYS:"
+                : mode === "hemingway"
+                ? "HEMINGWAY SAYS:"
+                : "SHORTER!"}
             </div>
             {loading && (
               <p className="text-sm text-zinc-500 animate-pulse">
@@ -180,8 +277,42 @@ export default function Home() {
           </div>
         )}
 
+        {/* Payment required */}
+        {pendingChallenge && (
+          <section className="rounded-xl border border-violet-200 bg-violet-50 p-6">
+            <h2 className="text-sm font-semibold text-violet-800 mb-2">
+              Payment Required (MPP)
+            </h2>
+            <p className="text-sm text-violet-700 mb-1">{paymentStatus}</p>
+            <p className="text-xs text-violet-500 mb-4">
+              Method: {pendingChallenge.method} | Intent:{" "}
+              {pendingChallenge.intent}
+            </p>
+            {!authenticated ? (
+              <button
+                onClick={login}
+                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition-colors"
+              >
+                Sign in to pay
+              </button>
+            ) : !embeddedWallet ? (
+              <p className="text-sm text-violet-600">
+                Setting up your wallet...
+              </p>
+            ) : (
+              <button
+                onClick={handlePayAndRetry}
+                disabled={loading}
+                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-40 transition-colors"
+              >
+                {loading ? "Processing..." : "Pay & continue"}
+              </button>
+            )}
+          </section>
+        )}
+
         {/* Error */}
-        {error && (
+        {error && !pendingChallenge && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
@@ -308,6 +439,15 @@ export default function Home() {
             rel="noopener noreferrer"
           >
             teenytiny.ai
+          </a>
+          {" "}&amp;{" "}
+          <a
+            href="https://mpp.dev"
+            className="underline hover:text-zinc-600"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            MPP
           </a>
         </div>
       </footer>
