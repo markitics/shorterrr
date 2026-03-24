@@ -5,29 +5,39 @@ import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/reac
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
 import type { MppChallenge } from "@/lib/mpp";
 
-type Mode = "shorter" | "joe" | "hemingway";
+type Mode = "shorter" | "joe" | "riddle" | "hemingway";
 
 const MODE_CONFIG: Record<
   Mode,
-  { label: string; description: string; buttonText: string; resultLabel: string }
+  { label: string; description: string; buttonText: string; resultLabel: string; color: string }
 > = {
   shorter: {
     label: "Shorterrr!",
     description: "Rewrites your message to be dramatically shorter",
     buttonText: "Make it shorter!",
     resultLabel: "Here's a shorter version you can send instead:",
+    color: "emerald",
   },
   joe: {
-    label: "Tips from Joe",
-    description: "Joe always has the same advice...",
+    label: "Joe Mode",
+    description: "Joe says it's too long — and gives you a shorter version (powered by Claude)",
     buttonText: "Ask Joe",
     resultLabel: "Joe says:",
+    color: "amber",
+  },
+  riddle: {
+    label: "Answer in Riddles",
+    description: "A surreal poet interprets your message (powered by TeenyTiny AI's racter)",
+    buttonText: "Get a riddle",
+    resultLabel: "The poet speaks:",
+    color: "purple",
   },
   hemingway: {
-    label: "Tips from Hemingway",
-    description: "Writing feedback inspired by Hemingway's principles",
+    label: "Hemingway",
+    description: "Writing feedback using hard-coded readability rules — always free",
     buttonText: "Get Hemingway's take",
     resultLabel: "Hemingway's feedback:",
+    color: "blue",
   },
 };
 
@@ -46,6 +56,7 @@ export default function Home() {
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
 
   const config = MODE_CONFIG[mode];
+  const c = config.color; // shorthand for color classes
 
   async function callApi(mppCredential?: string) {
     const res = await fetch("/api/shorten", {
@@ -269,6 +280,8 @@ export default function Home() {
             <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
               {mode === "joe"
                 ? "JOE SAYS:"
+                : mode === "riddle"
+                ? "THE POET SPEAKS:"
                 : mode === "hemingway"
                 ? "HEMINGWAY SAYS:"
                 : "SHORTER!"}
@@ -277,8 +290,10 @@ export default function Home() {
               <p className="text-sm text-zinc-500 animate-pulse">
                 {mode === "joe"
                   ? "Consulting Joe..."
+                  : mode === "riddle"
+                  ? "Composing riddles..."
                   : mode === "hemingway"
-                  ? "Channeling Hemingway..."
+                  ? "Analyzing your writing..."
                   : "Rewriting your message..."}
               </p>
             )}
@@ -334,21 +349,23 @@ export default function Home() {
         {shortened && (
           <section
             className={`rounded-xl border p-6 ${
-              mode === "joe"
-                ? "border-amber-200 bg-amber-50"
-                : mode === "hemingway"
-                ? "border-blue-200 bg-blue-50"
-                : "border-emerald-200 bg-emerald-50"
+              ({
+                emerald: "border-emerald-200 bg-emerald-50",
+                amber: "border-amber-200 bg-amber-50",
+                purple: "border-purple-200 bg-purple-50",
+                blue: "border-blue-200 bg-blue-50",
+              })[c]
             }`}
           >
             <div className="flex items-center justify-between mb-3">
               <h2
                 className={`text-sm font-semibold ${
-                  mode === "joe"
-                    ? "text-amber-800"
-                    : mode === "hemingway"
-                    ? "text-blue-800"
-                    : "text-emerald-800"
+                  ({
+                    emerald: "text-emerald-800",
+                    amber: "text-amber-800",
+                    purple: "text-purple-800",
+                    blue: "text-blue-800",
+                  })[c]
                 }`}
               >
                 {config.resultLabel}
@@ -368,11 +385,12 @@ export default function Home() {
             </div>
             <div
               className={`rounded-lg bg-white border px-4 py-3 text-base text-zinc-900 whitespace-pre-wrap ${
-                mode === "joe"
-                  ? "border-amber-100"
-                  : mode === "hemingway"
-                  ? "border-blue-100"
-                  : "border-emerald-100"
+                ({
+                  emerald: "border-emerald-100",
+                  amber: "border-amber-100",
+                  purple: "border-purple-100",
+                  blue: "border-blue-100",
+                })[c]
               }`}
             >
               {shortened}
@@ -381,11 +399,12 @@ export default function Home() {
               <button
                 onClick={handleCopy}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
-                  mode === "joe"
-                    ? "bg-amber-600 hover:bg-amber-700"
-                    : mode === "hemingway"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-emerald-600 hover:bg-emerald-700"
+                  ({
+                    emerald: "bg-emerald-600 hover:bg-emerald-700",
+                    amber: "bg-amber-600 hover:bg-amber-700",
+                    purple: "bg-purple-600 hover:bg-purple-700",
+                    blue: "bg-blue-600 hover:bg-blue-700",
+                  })[c]
                 }`}
               >
                 Copy to clipboard
@@ -451,6 +470,15 @@ export default function Home() {
             rel="noopener noreferrer"
           >
             teenytiny.ai
+          </a>
+          ,{" "}
+          <a
+            href="https://anthropic.com"
+            className="underline hover:text-zinc-600"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Anthropic
           </a>
           {" "}&amp;{" "}
           <a
