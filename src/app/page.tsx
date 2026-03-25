@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
 import { analyze } from "@/lib/hemingway";
 import type { MppChallenge } from "@/lib/mpp";
@@ -93,6 +93,7 @@ function HemingwayDisplay({
   sliderText,
   sliderLoading,
   originalText,
+  fixedCategories,
 }: {
   result: HemingwayResult;
   dismissed: Set<IssueCategory>;
@@ -105,6 +106,8 @@ function HemingwayDisplay({
   sliderText: string | null;
   sliderLoading: boolean;
   originalText: string;
+  /** Categories the slider has already fixed (so we don't highlight them in the slider text) */
+  fixedCategories: IssueCategory[];
 }) {
   const { grade, stats, sentences, summary } = result;
 
@@ -126,8 +129,9 @@ function HemingwayDisplay({
     activeCategories.length === 0 &&
     SEVERITY_ORDER.every((cat) => getCategoryCount(summary, cat) === 0 || dismissed.has(cat));
 
-  // Text to display: slider text if available, otherwise highlighted original
-  const displayText = sliderText;
+  // When slider is active, re-analyze the fixed text and show remaining highlights
+  const sliderAnalysis = sliderText ? analyze(sliderText) : null;
+  const sliderDismissed = new Set([...dismissed, ...fixedCategories]);
 
   return (
     <div className="space-y-6">
@@ -225,10 +229,12 @@ function HemingwayDisplay({
         </div>
       )}
 
-      {/* Display text — slider result or highlighted original */}
-      {displayText ? (
-        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200 whitespace-pre-wrap">
-          {displayText}
+      {/* Display text — slider result (re-analyzed with highlights) or original highlighted */}
+      {sliderAnalysis ? (
+        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
+          {sliderAnalysis.sentences.map((s: SentenceAnalysis, i: number) => (
+            <SentenceSpan key={i} sentence={s} dismissed={sliderDismissed} />
+          ))}
         </div>
       ) : (
         <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
@@ -392,7 +398,7 @@ export default function Home() {
 
   const { login, ready, authenticated, user, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
-  const embeddedWallet = getEmbeddedConnectedWallet(wallets);
+  const connectedWallet = wallets[0] ?? null;
 
   const config = MODE_CONFIG[mode];
   const c = config.color;
@@ -475,7 +481,7 @@ export default function Home() {
   }
 
   async function handlePayAndRetry() {
-    if (!pendingChallenge || !embeddedWallet) return;
+    if (!pendingChallenge || !connectedWallet) return;
 
     setLoading(true);
     setPaymentStatus("Processing payment...");
@@ -484,7 +490,7 @@ export default function Home() {
       const credential = encodeCredential({
         challenge: pendingChallenge.raw,
         payload: {
-          walletAddress: embeddedWallet.address,
+          walletAddress: connectedWallet.address,
           method: pendingChallenge.method,
         },
       });
@@ -648,24 +654,14 @@ export default function Home() {
             {ready && authenticated && (
               <div className="flex items-center gap-2">
                 {walletsReady && wallets.length > 0 ? (
-                  <div className="flex flex-col items-end gap-0.5">
-                    {wallets.map((w) => (
-                      <span key={w.address} className="text-xs font-mono text-teal-400">
-                        {w.address.slice(0, 6)}...{w.address.slice(-4)}
-                        <span className="text-slate-500 ml-1">
-                          ({w.walletClientType === "privy" ? "embedded" : w.walletClientType || "external"})
-                        </span>
-                      </span>
-                    ))}
-                  </div>
+                  <span className="text-xs font-mono text-teal-400 hidden sm:inline">
+                    {wallets[0].address.slice(0, 6)}...{wallets[0].address.slice(-4)}
+                  </span>
                 ) : !walletsReady ? (
                   <span className="text-xs text-slate-500 animate-pulse">
-                    Loading wallets...
+                    Loading...
                   </span>
                 ) : null}
-                <span className="text-xs text-slate-400">
-                  {user?.email?.address || "Connected"}
-                </span>
                 <button
                   onClick={logout}
                   className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 transition-colors"
@@ -855,7 +851,7 @@ export default function Home() {
               <p className="text-sm text-violet-400 animate-pulse">
                 Loading wallet...
               </p>
-            ) : !embeddedWallet ? (
+            ) : !connectedWallet ? (
               <p className="text-sm text-violet-400">
                 Wallet not found. Try signing out and back in.
               </p>
@@ -893,6 +889,7 @@ export default function Home() {
               sliderText={sliderText}
               sliderLoading={sliderLoading}
               originalText={draft}
+              fixedCategories={activeCategories.slice(0, sliderValue)}
             />
           </section>
         )}
