@@ -216,6 +216,7 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("joe");
   const [pendingChallenge, setPendingChallenge] = useState<MppChallenge | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
+  const [copied, setCopied] = useState(false);
 
   const { login, ready, authenticated, user, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
@@ -325,6 +326,8 @@ export default function Home() {
 
   function handleCopy() {
     navigator.clipboard.writeText(shortened);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   function handleReset() {
@@ -616,7 +619,7 @@ export default function Home() {
                   })[c]
                 }`}
               >
-                Copy to clipboard
+                {copied ? "Copied!" : "Copy"}
               </button>
               {mode === "joe" && (
                 <button
