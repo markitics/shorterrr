@@ -220,6 +220,9 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [undoSnapshot, setUndoSnapshot] = useState<{ draft: string; shortened: string; joeReaction: string; hemingwayResult: HemingwayResult | null; hasShouted: boolean } | null>(null);
 
+  // Cache results per mode so toggling back restores them
+  const resultCache = useRef<Record<string, { shortened: string; joeReaction: string; hemingwayResult: HemingwayResult | null; hasShouted: boolean; draft: string }>>({});
+
   const { login, ready, authenticated, user, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
@@ -442,12 +445,25 @@ export default function Home() {
             <button
               key={m}
               onClick={() => {
+                // Save current results to cache
+                if (shortened || hemingwayResult) {
+                  resultCache.current[mode] = { shortened, joeReaction, hemingwayResult, hasShouted, draft };
+                }
+                // Restore cached results for target mode (only if draft hasn't changed)
+                const cached = resultCache.current[m];
+                if (cached && cached.draft === draft) {
+                  setShortened(cached.shortened);
+                  setJoeReaction(cached.joeReaction);
+                  setHemingwayResult(cached.hemingwayResult);
+                  setHasShouted(cached.hasShouted);
+                } else {
+                  setShortened("");
+                  setJoeReaction("");
+                  setHemingwayResult(null);
+                  setHasShouted(false);
+                }
                 setMode(m);
-                setShortened("");
-                setJoeReaction("");
-                setHemingwayResult(null);
                 setError("");
-                setHasShouted(false);
                 setPendingChallenge(null);
                 setPaymentStatus("");
               }}
