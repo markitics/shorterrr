@@ -234,12 +234,13 @@ function HemingwayDisplay({
           if (count === 0) return null;
           const meta = CATEGORY_META[cat];
           const isDismissed = dismissed.has(cat);
+          const isFixedBySlider = fixedCategories.includes(cat);
           const isFixing = fixingCategory === cat;
 
           return (
             <div
               key={cat}
-              className={`rounded-lg ${meta.bg} ${meta.border} border px-3 py-2 flex items-center justify-between gap-2 ${isDismissed ? "opacity-40" : ""}`}
+              className={`rounded-lg ${meta.bg} ${meta.border} border px-3 py-2 flex items-center justify-between gap-2 ${isDismissed ? "opacity-40" : ""} ${isFixedBySlider ? "opacity-60" : ""}`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`text-lg font-bold ${meta.text}`}>{count}</span>
@@ -248,7 +249,11 @@ function HemingwayDisplay({
                 </span>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                {isDismissed ? (
+                {isFixedBySlider ? (
+                  <span className="rounded px-2 py-1 text-xs font-medium text-emerald-400 border border-emerald-700 bg-emerald-950">
+                    Fixed
+                  </span>
+                ) : isDismissed ? (
                   <button
                     onClick={() => onUndismiss(cat)}
                     className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-600 hover:bg-slate-700 transition-colors"
