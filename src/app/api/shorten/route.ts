@@ -149,6 +149,7 @@ const CATEGORY_INSTRUCTIONS: Record<string, string> = {
   "passive": "Convert passive voice to active voice where possible (e.g. 'was done by me' → 'I did it').",
   "adverb": "Remove unnecessary adverbs (words ending in -ly like 'extremely', 'basically', 'actually'). Only remove them, don't replace with other filler.",
   "hedging": "Remove hedging and cagey language. Delete phrases like 'I think', 'I believe', 'I feel', 'probably', 'perhaps', 'maybe', 'just wanted to', 'kind of', 'sort of', 'if that makes sense', 'I'm not sure but', 'it seems', 'potentially', 'to be honest'. Replace with direct, confident statements. For example: 'I think we should do X' → 'We should do X'.",
+  "redundant": "Delete redundant throat-clearing phrases that add no meaning. Remove things like: 'I am writing to let you know that', 'I just wanted to reach out and', 'due to the fact that' (→ 'because'), 'in order to' (→ 'to'), 'at this point in time' (→ 'now'), 'it should be noted that', 'for the purpose of', 'in the event that' (→ 'if'), 'with regard to' (→ 'about'), 'on a daily basis' (→ 'daily'). Restructure sentences to be direct.",
 };
 
 async function handleHemingwayFix(message: string, fixCategories: string[]): Promise<NextResponse> {

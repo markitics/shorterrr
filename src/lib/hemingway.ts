@@ -30,6 +30,7 @@ export interface HemingwayResult {
     complexWords: number;
     veryUsage: number;
     hedging: number;
+    redundant: number;
   };
 }
 
@@ -41,13 +42,13 @@ export interface SentenceAnalysis {
 }
 
 export interface Issue {
-  type: "adverb" | "passive" | "complex" | "very" | "hedging";
+  type: "adverb" | "passive" | "complex" | "very" | "hedging" | "redundant";
   word: string;
   suggestion?: string;
   index: number; // character offset within sentence
 }
 
-export type IssueCategory = "very-hard" | "hard" | "very" | "complex" | "passive" | "adverb" | "hedging";
+export type IssueCategory = "very-hard" | "hard" | "very" | "complex" | "passive" | "adverb" | "hedging" | "redundant";
 
 /* ------------------------------------------------------------------ */
 /*  Complex word alternatives                                          */
@@ -240,6 +241,92 @@ function findHedging(sentence: string): { phrase: string; index: number }[] {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Redundant / throat-clearing phrases                                */
+/* ------------------------------------------------------------------ */
+
+const REDUNDANT_PHRASES = [
+  // Opening filler — "I'm writing to..."
+  "i am writing to let you know that",
+  "i am writing to inform you that",
+  "i am writing this email to",
+  "i'm writing to let you know that",
+  "i'm writing to inform you that",
+  "i just wanted to let you know that",
+  "i just wanted to reach out and",
+  "i just wanted to reach out to",
+  "i just wanted to take a moment to",
+  "i wanted to take a moment to",
+  "i wanted to reach out and",
+  "i wanted to reach out to",
+  "i thought i'd just take a quick moment to",
+  "i thought i would just",
+  "i'll get straight to the point",
+  "i wanted to proactively communicate",
+  "i am reaching out today to",
+  "i am reaching out to",
+  // Meta-commentary
+  "as you are probably aware",
+  "as you may already know",
+  "as i'm sure you're aware",
+  "as we all know",
+  "needless to say",
+  "it goes without saying",
+  "at the end of the day",
+  "when all is said and done",
+  "long story short",
+  // Filler closings
+  "please do not hesitate to",
+  "please don't hesitate to",
+  "if you have any questions please",
+  "let me know if that makes sense",
+  "if that makes sense",
+  "does that make sense",
+  "hope that helps",
+  "hope this helps",
+  "thanks in advance for your",
+  // Padding phrases
+  "in order to",
+  "for the purpose of",
+  "due to the fact that",
+  "owing to the fact that",
+  "despite the fact that",
+  "in light of the fact that",
+  "the fact that",
+  "it should be noted that",
+  "it is worth noting that",
+  "it is important to note that",
+  "at this point in time",
+  "at this current time",
+  "at the present time",
+  "in terms of",
+  "with regard to",
+  "with respect to",
+  "in the event that",
+  "in the process of",
+  "on a daily basis",
+  "on a regular basis",
+];
+
+function findRedundant(sentence: string): { phrase: string; index: number }[] {
+  const lower = sentence.toLowerCase();
+  const found: { phrase: string; index: number }[] = [];
+  for (const phrase of REDUNDANT_PHRASES) {
+    let startPos = 0;
+    while (true) {
+      const idx = lower.indexOf(phrase, startPos);
+      if (idx === -1) break;
+      const before = idx > 0 ? lower[idx - 1] : " ";
+      const after = idx + phrase.length < lower.length ? lower[idx + phrase.length] : " ";
+      if (/[\s,;.!?"'(\-]/.test(before) && /[\s,;.!?"')\-]/.test(after)) {
+        found.push({ phrase, index: idx });
+      }
+      startPos = idx + 1;
+    }
+  }
+  return found;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Sentence splitting                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -301,6 +388,7 @@ export function analyze(text: string): HemingwayResult {
         complexWords: 0,
         veryUsage: 0,
         hedging: 0,
+        redundant: 0,
       },
     };
   }
@@ -315,6 +403,7 @@ export function analyze(text: string): HemingwayResult {
   let totalComplex = 0;
   let totalVery = 0;
   let totalHedging = 0;
+  let totalRedundant = 0;
   let hardSentences = 0;
   let veryHardSentences = 0;
 
@@ -387,6 +476,18 @@ export function analyze(text: string): HemingwayResult {
       totalHedging++;
     });
 
+    // Check redundant / throat-clearing phrases
+    const redundants = findRedundant(sentence);
+    redundants.forEach(({ phrase, index }) => {
+      issues.push({
+        type: "redundant",
+        word: phrase,
+        suggestion: "Delete this — it adds no meaning",
+        index,
+      });
+      totalRedundant++;
+    });
+
     // Sentence difficulty
     let level: SentenceAnalysis["level"] = "ok";
     if (wc >= VERY_HARD_SENTENCE_WORDS) {
@@ -423,6 +524,7 @@ export function analyze(text: string): HemingwayResult {
       complexWords: totalComplex,
       veryUsage: totalVery,
       hedging: totalHedging,
+      redundant: totalRedundant,
     },
   };
 }

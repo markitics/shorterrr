@@ -39,7 +39,7 @@ const MODE_CONFIG: Record<
   },
   hemingway: {
     label: "Hemingway",
-    description: "Writing feedback using hard-coded readability rules — always free, no API",
+    description: "Writing feedback mainly using hard-coded readability rules of thumb",
     buttonText: "Analyze",
     resultLabel: "Hemingway's feedback:",
     color: "blue",
@@ -52,17 +52,19 @@ const MODE_CONFIG: Record<
 
 // Severity order: most severe first
 const SEVERITY_ORDER: IssueCategory[] = [
-  "very-hard", "hard", "very", "complex", "passive", "adverb", "hedging",
+  "very-hard", "hard", "very", "complex", "passive", "adverb", "hedging", "redundant",
 ];
 
-const CATEGORY_META: Record<IssueCategory, { label: string; bg: string; border: string; text: string; accent: string; dot: string }> = {
-  "very-hard": { label: "very hard to read", bg: "bg-red-950", border: "border-red-800", text: "text-red-400", accent: "text-red-300", dot: "bg-red-800 rounded" },
-  "hard":      { label: "hard to read",      bg: "bg-amber-950", border: "border-amber-800", text: "text-amber-400", accent: "text-amber-300", dot: "bg-amber-800 rounded" },
-  "very":      { label: "uses 'very'",        bg: "bg-orange-950", border: "border-orange-800", text: "text-orange-400", accent: "text-orange-300", dot: "bg-orange-600 rounded-full" },
-  "complex":   { label: "simpler alternative", bg: "bg-purple-950", border: "border-purple-800", text: "text-purple-400", accent: "text-purple-300", dot: "bg-purple-600 rounded-full" },
-  "passive":   { label: "passive voice",      bg: "bg-green-950", border: "border-green-800", text: "text-green-400", accent: "text-green-300", dot: "bg-green-600 rounded-full" },
-  "adverb":    { label: "adverb",             bg: "bg-sky-950", border: "border-sky-800", text: "text-sky-400", accent: "text-sky-300", dot: "bg-sky-600 rounded-full" },
-  "hedging":   { label: "hedging",            bg: "bg-rose-950", border: "border-rose-800", text: "text-rose-400", accent: "text-rose-300", dot: "bg-rose-600 rounded-full" },
+// Brighter, more distinct colors for dark backgrounds
+const CATEGORY_META: Record<IssueCategory, { label: string; bg: string; border: string; text: string; accent: string; dot: string; highlight: string }> = {
+  "very-hard": { label: "very hard to read", bg: "bg-red-950",    border: "border-red-700",    text: "text-red-400",    accent: "text-red-300",    dot: "bg-red-500 rounded",       highlight: "bg-red-700/60" },
+  "hard":      { label: "hard to read",      bg: "bg-yellow-950", border: "border-yellow-700",  text: "text-yellow-400", accent: "text-yellow-300", dot: "bg-yellow-500 rounded",    highlight: "bg-yellow-700/50" },
+  "very":      { label: "uses 'very'",        bg: "bg-orange-950", border: "border-orange-600",  text: "text-orange-400", accent: "text-orange-300", dot: "bg-orange-500 rounded-full", highlight: "bg-orange-600/60 underline decoration-orange-400 decoration-2" },
+  "complex":   { label: "simpler alternative", bg: "bg-violet-950", border: "border-violet-600",  text: "text-violet-400", accent: "text-violet-300", dot: "bg-violet-500 rounded-full", highlight: "bg-violet-600/60 underline decoration-violet-400 decoration-2" },
+  "passive":   { label: "passive voice",      bg: "bg-emerald-950",border: "border-emerald-600", text: "text-emerald-400",accent: "text-emerald-300",dot: "bg-emerald-500 rounded-full",highlight: "bg-emerald-600/60 underline decoration-emerald-400 decoration-2" },
+  "adverb":    { label: "adverb",             bg: "bg-cyan-950",   border: "border-cyan-600",    text: "text-cyan-400",   accent: "text-cyan-300",   dot: "bg-cyan-500 rounded-full",  highlight: "bg-cyan-600/60 underline decoration-cyan-400 decoration-2" },
+  "hedging":   { label: "hedging",            bg: "bg-pink-950",   border: "border-pink-600",    text: "text-pink-400",   accent: "text-pink-300",   dot: "bg-pink-500 rounded-full",  highlight: "bg-pink-600/60 underline decoration-pink-400 decoration-2" },
+  "redundant": { label: "redundant",          bg: "bg-fuchsia-950",border: "border-fuchsia-600", text: "text-fuchsia-400",accent: "text-fuchsia-300",dot: "bg-fuchsia-500 rounded-full",highlight: "bg-fuchsia-600/60 underline decoration-fuchsia-400 decoration-2" },
 };
 
 function getCategoryCount(summary: HemingwayResult["summary"], cat: IssueCategory): number {
@@ -74,7 +76,81 @@ function getCategoryCount(summary: HemingwayResult["summary"], cat: IssueCategor
     case "passive": return summary.passiveVoice;
     case "adverb": return summary.adverbs;
     case "hedging": return summary.hedging;
+    case "redundant": return summary.redundant;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Hemingway single-editor overlay                                    */
+/* ------------------------------------------------------------------ */
+
+function HemingwayEditor({
+  draft,
+  onDraftChange,
+  hemingwayResult,
+  dismissed,
+  sliderText,
+  sliderAnalysis,
+  sliderDismissed,
+  loading,
+}: {
+  draft: string;
+  onDraftChange: (v: string) => void;
+  hemingwayResult: HemingwayResult;
+  dismissed: Set<IssueCategory>;
+  sliderText: string | null;
+  sliderAnalysis: HemingwayResult | null;
+  sliderDismissed: Set<IssueCategory>;
+  loading: boolean;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
+
+  // Sync scroll positions
+  function handleScroll() {
+    if (textareaRef.current && highlightRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  }
+
+  // Auto-resize height to match content
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.max(200, textareaRef.current.scrollHeight) + "px";
+    }
+  }, [draft, sliderText]);
+
+  const displayResult = sliderAnalysis || hemingwayResult;
+  const displayDismissed = sliderAnalysis ? sliderDismissed : dismissed;
+  const displayText = sliderText || draft;
+
+  return (
+    <div className="relative w-full">
+      {/* Highlighted text layer (behind) */}
+      <div
+        ref={highlightRef}
+        className="absolute inset-0 rounded-lg border border-transparent bg-slate-800 px-4 py-3 text-base leading-relaxed text-slate-200 overflow-hidden pointer-events-none whitespace-pre-wrap break-words"
+        aria-hidden="true"
+      >
+        {displayResult.sentences.map((s: SentenceAnalysis, i: number) => (
+          <SentenceSpan key={i} sentence={s} dismissed={displayDismissed} />
+        ))}
+      </div>
+      {/* Transparent textarea (on top, captures input) */}
+      <textarea
+        ref={textareaRef}
+        id="draft"
+        className="relative w-full rounded-lg border border-slate-600 bg-transparent px-4 py-3 text-base leading-relaxed text-transparent caret-slate-100 placeholder-slate-500 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/25 resize-none overflow-hidden selection:bg-teal-500/30"
+        style={{ caretColor: "#f1f5f9" }}
+        placeholder='Paste your message here...'
+        value={displayText}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onScroll={handleScroll}
+        disabled={loading || !!sliderText}
+      />
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +161,7 @@ function HemingwayDisplay({
   result,
   dismissed,
   onDismiss,
+  onUndismiss,
   onAutoFix,
   fixingCategory,
   sliderValue,
@@ -98,6 +175,7 @@ function HemingwayDisplay({
   result: HemingwayResult;
   dismissed: Set<IssueCategory>;
   onDismiss: (cat: IssueCategory) => void;
+  onUndismiss: (cat: IssueCategory) => void;
   onAutoFix: (cat: IssueCategory) => void;
   fixingCategory: IssueCategory | null;
   sliderValue: number;
@@ -129,9 +207,7 @@ function HemingwayDisplay({
     activeCategories.length === 0 &&
     SEVERITY_ORDER.every((cat) => getCategoryCount(summary, cat) === 0 || dismissed.has(cat));
 
-  // When slider is active, re-analyze the fixed text and show remaining highlights
-  const sliderAnalysis = sliderText ? analyze(sliderText) : null;
-  const sliderDismissed = new Set([...dismissed, ...fixedCategories]);
+  // (Text display is now in HemingwayEditor overlay — this component only shows controls)
 
   return (
     <div className="space-y-6">
@@ -171,27 +247,36 @@ function HemingwayDisplay({
                   {meta.label}{cat !== "very" && count !== 1 ? "s" : ""}
                 </span>
               </div>
-              {!isDismissed && (
-                <div className="flex gap-1 flex-shrink-0">
+              <div className="flex gap-1 flex-shrink-0">
+                {isDismissed ? (
                   <button
-                    onClick={() => onAutoFix(cat)}
-                    disabled={isFixing || sliderLoading}
-                    className={`rounded px-2 py-1 text-xs font-medium text-white transition-colors ${
-                      isFixing
-                        ? "bg-slate-600 cursor-wait"
-                        : "bg-teal-600 hover:bg-teal-500"
-                    }`}
-                  >
-                    {isFixing ? "Fixing..." : "Auto-fix"}
-                  </button>
-                  <button
-                    onClick={() => onDismiss(cat)}
+                    onClick={() => onUndismiss(cat)}
                     className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-600 hover:bg-slate-700 transition-colors"
                   >
-                    Dismiss
+                    Show
                   </button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onAutoFix(cat)}
+                      disabled={isFixing || sliderLoading}
+                      className={`rounded px-2 py-1 text-xs font-medium text-white transition-colors ${
+                        isFixing
+                          ? "bg-slate-600 cursor-wait"
+                          : "bg-teal-600 hover:bg-teal-500"
+                      }`}
+                    >
+                      {isFixing ? "Fixing..." : "Auto-fix"}
+                    </button>
+                    <button
+                      onClick={() => onDismiss(cat)}
+                      className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-600 hover:bg-slate-700 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
@@ -220,27 +305,12 @@ function HemingwayDisplay({
           />
           {sliderValue > 0 && sliderValue < sliderMax && (
             <p className="text-xs text-slate-500 text-center">
-              Fixing: {activeCategories.slice(0, sliderValue).map((c) => CATEGORY_META[c].label).join(", ")}
+              {sliderLoading ? "Fixing" : "Fixed"}: {activeCategories.slice(0, sliderValue).map((c) => CATEGORY_META[c].label).join(", ")}
             </p>
           )}
           {sliderLoading && (
             <p className="text-xs text-teal-400 text-center animate-pulse">Applying fixes...</p>
           )}
-        </div>
-      )}
-
-      {/* Display text — slider result (re-analyzed with highlights) or original highlighted */}
-      {sliderAnalysis ? (
-        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
-          {sliderAnalysis.sentences.map((s: SentenceAnalysis, i: number) => (
-            <SentenceSpan key={i} sentence={s} dismissed={sliderDismissed} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
-          {sentences.map((s: SentenceAnalysis, i: number) => (
-            <SentenceSpan key={i} sentence={s} dismissed={dismissed} />
-          ))}
         </div>
       )}
 
@@ -257,52 +327,61 @@ function HemingwayDisplay({
 }
 
 function SentenceSpan({ sentence, dismissed }: { sentence: SentenceAnalysis; dismissed: Set<IssueCategory> }) {
+  const sentenceCat = sentence.level === "very-hard" ? "very-hard" : sentence.level === "hard" ? "hard" : null;
   const bgClass =
-    sentence.level === "very-hard" && !dismissed.has("very-hard")
-      ? "bg-red-900/50"
-      : sentence.level === "hard" && !dismissed.has("hard")
-      ? "bg-amber-900/50"
+    sentenceCat && !dismissed.has(sentenceCat)
+      ? CATEGORY_META[sentenceCat].highlight
       : "";
 
-  // Build a list of character ranges to highlight for hedging (multi-word)
-  const hedgingRanges: { start: number; end: number; issue: SentenceAnalysis["issues"][0] }[] = [];
+  // Multi-word issues (hedging, redundant, passive) need character-level ranges
+  const phraseRanges: { start: number; end: number; issue: SentenceAnalysis["issues"][0] }[] = [];
   const wordIssueMap = new Map<string, SentenceAnalysis["issues"][0]>();
 
   for (const issue of sentence.issues) {
     if (dismissed.has(issue.type as IssueCategory)) continue;
-    if (issue.type === "hedging") {
-      hedgingRanges.push({ start: issue.index, end: issue.index + issue.word.length, issue });
+    if (issue.type === "hedging" || issue.type === "redundant" || issue.type === "passive") {
+      phraseRanges.push({ start: issue.index, end: issue.index + issue.word.length, issue });
     } else {
       wordIssueMap.set(issue.word.toLowerCase(), issue);
     }
   }
 
-  function getIssueColor(issue: SentenceAnalysis["issues"][0]) {
-    switch (issue.type) {
-      case "adverb": return "bg-sky-800 underline decoration-sky-400";
-      case "passive": return "bg-green-800 underline decoration-green-400";
-      case "very": return "bg-orange-800 underline decoration-orange-400";
-      case "hedging": return "bg-rose-800 underline decoration-rose-400";
-      case "complex": return "bg-purple-800 underline decoration-purple-400";
-      default: return "bg-purple-800 underline decoration-purple-400";
-    }
+  function getHighlight(issue: SentenceAnalysis["issues"][0]) {
+    return CATEGORY_META[issue.type as IssueCategory]?.highlight || "bg-slate-600 underline";
   }
 
-  function getIssueTitle(issue: SentenceAnalysis["issues"][0]) {
+  function getTitle(issue: SentenceAnalysis["issues"][0]) {
+    if (issue.suggestion) return issue.suggestion;
     switch (issue.type) {
-      case "complex": return `Try "${issue.suggestion}" instead`;
       case "adverb": return "Consider removing this adverb";
       case "very": return "Delete 'very', or use a stronger adjective";
       case "hedging": return "Be direct — remove hedging language";
+      case "redundant": return "Delete this — it adds no meaning";
       case "passive": return "Consider using active voice";
       default: return "";
     }
   }
 
-  // For hedging: we need character-level rendering. Build segments.
-  if (hedgingRanges.length > 0) {
-    // Sort ranges by start position
-    const sorted = [...hedgingRanges].sort((a, b) => a.start - b.start);
+  function renderWord(w: string, key: string | number) {
+    const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
+    const issue = wordIssueMap.get(clean);
+    if (issue) {
+      return (
+        <span
+          key={key}
+          className={`${getHighlight(issue)} rounded-sm cursor-help transition-all hover:brightness-150 hover:ring-2 hover:ring-white/40`}
+          title={getTitle(issue)}
+        >
+          {w}
+        </span>
+      );
+    }
+    return <span key={key}>{w}</span>;
+  }
+
+  // If there are multi-word phrase matches, use character-level segmentation
+  if (phraseRanges.length > 0) {
+    const sorted = [...phraseRanges].sort((a, b) => a.start - b.start);
     const segments: { text: string; issue?: SentenceAnalysis["issues"][0] }[] = [];
     let pos = 0;
     for (const range of sorted) {
@@ -321,47 +400,26 @@ function SentenceSpan({ sentence, dismissed }: { sentence: SentenceAnalysis; dis
         {segments.map((seg, si) => {
           if (seg.issue) {
             return (
-              <span key={si} className={`${getIssueColor(seg.issue)} rounded-sm cursor-help`} title={getIssueTitle(seg.issue)}>
+              <span
+                key={si}
+                className={`${getHighlight(seg.issue)} rounded-sm cursor-help transition-all hover:brightness-150 hover:ring-2 hover:ring-white/40`}
+                title={getTitle(seg.issue)}
+              >
                 {seg.text}
               </span>
             );
           }
-          // For non-hedging segments, still do word-level highlighting
-          const words = seg.text.split(/(\s+)/);
-          return words.map((w, wi) => {
-            const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
-            const issue = wordIssueMap.get(clean);
-            if (issue) {
-              return (
-                <span key={`${si}-${wi}`} className={`${getIssueColor(issue)} rounded-sm cursor-help`} title={getIssueTitle(issue)}>
-                  {w}
-                </span>
-              );
-            }
-            return <span key={`${si}-${wi}`}>{w}</span>;
-          });
+          return seg.text.split(/(\s+)/).map((w, wi) => renderWord(w, `${si}-${wi}`));
         })}
         {" "}
       </span>
     );
   }
 
-  // No hedging — simple word-by-word highlighting
-  const words = sentence.text.split(/(\s+)/);
+  // Simple word-by-word highlighting
   return (
     <span className={`${bgClass} rounded-sm`}>
-      {words.map((w, i) => {
-        const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
-        const issue = wordIssueMap.get(clean);
-        if (issue) {
-          return (
-            <span key={i} className={`${getIssueColor(issue)} rounded-sm cursor-help`} title={getIssueTitle(issue)}>
-              {w}
-            </span>
-          );
-        }
-        return <span key={i}>{w}</span>;
-      })}
+      {sentence.text.split(/(\s+)/).map((w, i) => renderWord(w, i))}
       {" "}
     </span>
   );
@@ -412,10 +470,11 @@ export default function Home() {
       setHasShouted(false);
       return;
     }
-    // Reset slider state when draft changes
+    // Reset slider + dismissed state when draft changes
     setSliderValue(0);
     setSliderText(null);
     sliderCache.current = {};
+    setDismissedCategories(new Set());
 
     debounceRef.current = setTimeout(() => {
       setHemingwayResult(analyze(draft));
@@ -601,6 +660,14 @@ export default function Home() {
     setDismissedCategories((prev) => new Set([...prev, cat]));
   }
 
+  function handleUndismiss(cat: IssueCategory) {
+    setDismissedCategories((prev) => {
+      const next = new Set(prev);
+      next.delete(cat);
+      return next;
+    });
+  }
+
   async function handleSliderChange(value: number) {
     setSliderValue(value);
     if (value === 0) {
@@ -740,28 +807,35 @@ export default function Home() {
               Generate example message
             </button>
           </div>
-          <textarea
-            id="draft"
-            rows={8}
-            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 placeholder-slate-500 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/25 resize-y"
-            placeholder='Paste your message here... e.g. "Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should..."'
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault();
-                if (mode === "hemingway") {
-                  if (draft.trim()) {
-                    setHemingwayResult(analyze(draft));
-                    setHasShouted(true);
-                  }
-                } else {
+          {mode === "hemingway" && hemingwayResult ? (
+            /* Single-editor overlay: transparent textarea on top of highlighted text */
+            <HemingwayEditor
+              draft={draft}
+              onDraftChange={setDraft}
+              hemingwayResult={hemingwayResult}
+              dismissed={dismissedCategories}
+              sliderText={sliderText}
+              sliderAnalysis={sliderText ? analyze(sliderText) : null}
+              sliderDismissed={new Set([...dismissedCategories, ...activeCategories.slice(0, sliderValue)])}
+              loading={loading}
+            />
+          ) : (
+            <textarea
+              id="draft"
+              rows={8}
+              className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 placeholder-slate-500 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/25 resize-y"
+              placeholder='Paste your message here... e.g. "Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should..."'
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
                   handleShorten();
                 }
-              }
-            }}
-            disabled={loading}
-          />
+              }}
+              disabled={loading}
+            />
+          )}
           <div className="mt-2 flex items-center justify-between">
             <span className="text-xs text-slate-500">
               {wordCount} word{wordCount !== 1 ? "s" : ""}
@@ -874,24 +948,23 @@ export default function Home() {
           </div>
         )}
 
-        {/* Hemingway result (client-side analysis) */}
+        {/* Hemingway controls (cards, slider, legend) */}
         {hemingwayResult && mode === "hemingway" && (
-          <section className="rounded-xl border border-sky-800 bg-slate-900 p-6">
-            <HemingwayDisplay
-              result={hemingwayResult}
-              dismissed={dismissedCategories}
-              onDismiss={handleDismiss}
-              onAutoFix={handleAutoFix}
-              fixingCategory={fixingCategory}
-              sliderValue={sliderValue}
-              sliderMax={activeCategories.length}
-              onSliderChange={handleSliderChange}
-              sliderText={sliderText}
-              sliderLoading={sliderLoading}
-              originalText={draft}
-              fixedCategories={activeCategories.slice(0, sliderValue)}
-            />
-          </section>
+          <HemingwayDisplay
+            result={hemingwayResult}
+            dismissed={dismissedCategories}
+            onDismiss={handleDismiss}
+            onUndismiss={handleUndismiss}
+            onAutoFix={handleAutoFix}
+            fixingCategory={fixingCategory}
+            sliderValue={sliderValue}
+            sliderMax={activeCategories.length}
+            onSliderChange={handleSliderChange}
+            sliderText={sliderText}
+            sliderLoading={sliderLoading}
+            originalText={draft}
+            fixedCategories={activeCategories.slice(0, sliderValue)}
+          />
         )}
 
         {/* Joe mode result — separated reaction + shorter version */}
