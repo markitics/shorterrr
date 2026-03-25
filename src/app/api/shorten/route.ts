@@ -1,30 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /* ------------------------------------------------------------------ */
-/*  Prompt builders                                                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Build prompt for teenytiny.ai's eliza model (shorter mode).
- * Eliza ignores system prompts so everything goes in the user message.
- */
-function buildShorterPrompt(message: string): string {
-  return `You are a writing assistant called "Shorterrr!" that rewrites messages to be dramatically shorter.
-
-Your task: rewrite the message below to be at least 50% shorter while keeping all critical information (dates, numbers, action items). Remove filler words, unnecessary context, and over-explanation. Keep the tone professional but direct.
-
-IMPORTANT: Reply with ONLY the shortened message. No explanations, no preamble, no "Here's a shorter version" — just the rewritten message itself.
-
-Here is the message to shorten:
-
----
-${message}
----
-
-Shortened version:`;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Joe mode — Anthropic Claude API                                    */
 /* ------------------------------------------------------------------ */
 
@@ -162,74 +138,11 @@ async function handleRiddleMode(message: string, mppCredential?: string): Promis
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shorter mode — TeenyTiny AI eliza model                            */
-/* ------------------------------------------------------------------ */
-
-async function handleShorterMode(message: string, mppCredential?: string): Promise<NextResponse> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (mppCredential) {
-    headers["Authorization"] = mppCredential;
-  } else {
-    const apiKey = process.env.TEENYTINY_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Server misconfiguration: missing API key." },
-        { status: 500 }
-      );
-    }
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  try {
-    const response = await fetch("https://teenytiny.ai/v1/chat/completions", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: "eliza",
-        messages: [{ role: "user", content: buildShorterPrompt(message) }],
-      }),
-    });
-
-    if (response.status === 402) {
-      const wwwAuth = response.headers.get("WWW-Authenticate") || "";
-      return NextResponse.json(
-        { error: "Payment required", paymentRequired: true, challenge: wwwAuth },
-        { status: 402 }
-      );
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("TeenyTiny API error:", response.status, errorText);
-      return NextResponse.json(
-        { error: "Failed to get a response from the AI." },
-        { status: 502 }
-      );
-    }
-
-    const data = await response.json();
-    const shortened = data.choices?.[0]?.message?.content ?? "Could not process the message.";
-    const receipt = response.headers.get("Payment-Receipt");
-
-    return NextResponse.json({ shortened, receipt });
-  } catch (error) {
-    console.error("Error calling TeenyTiny API:", error);
-    return NextResponse.json(
-      { error: "Something went wrong. Please try again." },
-      { status: 500 }
-    );
-  }
-}
-
-/* ------------------------------------------------------------------ */
 /*  POST handler                                                       */
 /* ------------------------------------------------------------------ */
 
 export async function POST(req: NextRequest) {
-  const { message, mode = "shorter", mppCredential } = await req.json();
+  const { message, mode = "joe", mppCredential } = await req.json();
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json(
@@ -244,12 +157,11 @@ export async function POST(req: NextRequest) {
     case "riddle":
       return handleRiddleMode(message, mppCredential);
     case "hemingway":
-      // Hemingway mode is client-side only — no API needed
       return NextResponse.json(
         { error: "Hemingway analysis runs client-side. No API call needed." },
         { status: 400 }
       );
     default:
-      return handleShorterMode(message, mppCredential);
+      return handleJoeMode(message);
   }
 }

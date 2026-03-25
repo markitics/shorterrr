@@ -7,23 +7,16 @@ import { analyze } from "@/lib/hemingway";
 import type { MppChallenge } from "@/lib/mpp";
 import type { HemingwayResult, SentenceAnalysis } from "@/lib/hemingway";
 
-type Mode = "shorter" | "joe" | "riddle" | "hemingway";
+type Mode = "joe" | "riddle" | "hemingway";
 
 const MODE_CONFIG: Record<
   Mode,
   { label: string; description: string; buttonText: string; resultLabel: string; color: string }
 > = {
-  shorter: {
-    label: "Shorterrr!",
-    description: "Rewrites your message to be dramatically shorter",
-    buttonText: "Make it shorter!",
-    resultLabel: "Here's a shorter version you can send instead:",
-    color: "emerald",
-  },
   joe: {
     label: "Joe Mode",
     description: "Joe says it's too long — and gives you a shorter version (powered by Claude)",
-    buttonText: "Ask Joe",
+    buttonText: "Make it shorter!",
     resultLabel: "Joe says:",
     color: "amber",
   },
@@ -210,7 +203,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasShouted, setHasShouted] = useState(false);
-  const [mode, setMode] = useState<Mode>("shorter");
+  const [mode, setMode] = useState<Mode>("joe");
   const [pendingChallenge, setPendingChallenge] = useState<MppChallenge | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
 
@@ -449,22 +442,18 @@ export default function Home() {
           <div className="flex flex-col items-center gap-2">
             <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
               {mode === "joe"
-                ? "JOE SAYS:"
+                ? "SHORTER!"
                 : mode === "riddle"
                 ? "THE POET SPEAKS:"
-                : mode === "hemingway"
-                ? "HEMINGWAY SAYS:"
-                : "SHORTER!"}
+                : "HEMINGWAY SAYS:"}
             </div>
             {loading && (
               <p className="text-sm text-zinc-500 animate-pulse">
                 {mode === "joe"
-                  ? "Consulting Joe..."
+                  ? "Joe is rewriting your message..."
                   : mode === "riddle"
                   ? "Composing riddles..."
-                  : mode === "hemingway"
-                  ? "Analyzing your writing..."
-                  : "Rewriting your message..."}
+                  : "Analyzing your writing..."}
               </p>
             )}
           </div>
@@ -547,8 +536,8 @@ export default function Home() {
               >
                 {config.resultLabel}
               </h2>
-              {mode === "shorter" && (
-                <span className="text-xs text-emerald-600">
+              {mode === "joe" && shortenedWordCount > 0 && (
+                <span className="text-xs text-amber-600">
                   {shortenedWordCount} word
                   {shortenedWordCount !== 1 ? "s" : ""} (
                   {wordCount > 0
@@ -586,11 +575,11 @@ export default function Home() {
               >
                 Copy to clipboard
               </button>
-              {mode === "shorter" && (
+              {mode === "joe" && (
                 <button
                   onClick={handleShorten}
                   disabled={loading}
-                  className="rounded-lg border border-emerald-300 px-5 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  className="rounded-lg border border-amber-300 px-5 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
                 >
                   Even shorter!
                 </button>
@@ -611,7 +600,7 @@ export default function Home() {
               {
                 step: "2",
                 title: "Pick a mode",
-                desc: "Shorter, Joe, Riddles, or Hemingway — each gives different feedback.",
+                desc: "Joe Mode, Riddles, or Hemingway — each gives different feedback.",
               },
               {
                 step: "3",
