@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/react-auth";
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
 import { analyze } from "@/lib/hemingway";
@@ -214,6 +214,24 @@ export default function Home() {
   const config = MODE_CONFIG[mode];
   const c = config.color;
 
+  // Auto-analyze in Hemingway mode with 400ms debounce
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (mode !== "hemingway") return;
+    if (!draft.trim()) {
+      setHemingwayResult(null);
+      setHasShouted(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      setHemingwayResult(analyze(draft));
+      setHasShouted(true);
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [draft, mode]);
+
   async function callApi(mppCredential?: string) {
     const res = await fetch("/api/shorten", {
       method: "POST",
@@ -244,6 +262,9 @@ export default function Home() {
   async function handleShorten() {
     if (!draft.trim()) return;
 
+    // Hemingway auto-analyzes via debounce, no manual trigger needed
+    if (mode === "hemingway") return;
+
     setLoading(true);
     setError("");
     setShortened("");
@@ -251,14 +272,6 @@ export default function Home() {
     setHasShouted(true);
     setPendingChallenge(null);
     setPaymentStatus("");
-
-    // Hemingway mode: client-side only, no API call
-    if (mode === "hemingway") {
-      const result = analyze(draft);
-      setHemingwayResult(result);
-      setLoading(false);
-      return;
-    }
 
     try {
       const data = await callApi();
@@ -347,11 +360,7 @@ export default function Home() {
                   <span className="text-xs text-zinc-400 animate-pulse">
                     Loading...
                   </span>
-                ) : (
-                  <span className="text-xs text-amber-500 animate-pulse">
-                    Creating wallet...
-                  </span>
-                )}
+                ) : null}
                 <span className="text-xs text-zinc-500">
                   {user?.email?.address || "Connected"}
                 </span>
@@ -426,34 +435,30 @@ export default function Home() {
                   Start over
                 </button>
               )}
-              <button
-                onClick={handleShorten}
-                disabled={!draft.trim() || loading}
-                className="rounded-lg bg-red-500 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? "Working..." : config.buttonText}
-              </button>
+              {mode !== "hemingway" && (
+                <button
+                  onClick={handleShorten}
+                  disabled={!draft.trim() || loading}
+                  className="rounded-lg bg-red-500 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading ? "Working..." : config.buttonText}
+                </button>
+              )}
             </div>
           </div>
         </section>
 
-        {/* SHORTER! shout */}
-        {hasShouted && (
+        {/* SHORTER! shout (not for hemingway — it auto-analyzes) */}
+        {hasShouted && mode !== "hemingway" && (
           <div className="flex flex-col items-center gap-2">
             <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
-              {mode === "joe"
-                ? "SHORTER!"
-                : mode === "riddle"
-                ? "THE POET SPEAKS:"
-                : "HEMINGWAY SAYS:"}
+              {mode === "joe" ? "SHORTER!" : "THE POET SPEAKS:"}
             </div>
             {loading && (
               <p className="text-sm text-zinc-500 animate-pulse">
                 {mode === "joe"
                   ? "Joe is rewriting your message..."
-                  : mode === "riddle"
-                  ? "Composing riddles..."
-                  : "Analyzing your writing..."}
+                  : "Composing riddles..."}
               </p>
             )}
           </div>
