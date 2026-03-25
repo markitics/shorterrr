@@ -47,59 +47,59 @@ function HemingwayDisplay({ result }: { result: HemingwayResult }) {
     grade <= 6 ? "Good" : grade <= 10 ? "OK" : grade <= 14 ? "Poor" : "Very Poor";
   const gradeColor =
     grade <= 6
-      ? "text-emerald-600"
+      ? "text-emerald-400"
       : grade <= 10
-      ? "text-amber-600"
-      : "text-red-600";
+      ? "text-amber-400"
+      : "text-red-400";
 
   return (
     <div className="space-y-6">
       {/* Stats bar */}
       <div className="flex flex-wrap gap-4">
-        <div className="rounded-lg border border-blue-200 bg-white px-4 py-3 text-center min-w-[100px]">
+        <div className="rounded-lg border border-sky-700 bg-slate-800 px-4 py-3 text-center min-w-[100px]">
           <div className={`text-2xl font-bold ${gradeColor}`}>Grade {grade}</div>
-          <div className="text-xs text-zinc-500">{gradeLabel}</div>
+          <div className="text-xs text-slate-400">{gradeLabel}</div>
         </div>
-        <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center min-w-[80px]">
-          <div className="text-2xl font-bold text-zinc-800">{stats.words}</div>
-          <div className="text-xs text-zinc-500">Words</div>
+        <div className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-center min-w-[80px]">
+          <div className="text-2xl font-bold text-slate-200">{stats.words}</div>
+          <div className="text-xs text-slate-400">Words</div>
         </div>
-        <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center min-w-[80px]">
-          <div className="text-2xl font-bold text-zinc-800">{stats.sentences}</div>
-          <div className="text-xs text-zinc-500">Sentences</div>
+        <div className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-center min-w-[80px]">
+          <div className="text-2xl font-bold text-slate-200">{stats.sentences}</div>
+          <div className="text-xs text-slate-400">Sentences</div>
         </div>
       </div>
 
       {/* Issue summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {summary.veryHardSentences > 0 && (
-          <div className="rounded-lg bg-red-100 border border-red-200 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-red-700">{summary.veryHardSentences}</div>
-            <div className="text-xs text-red-600">very hard to read</div>
+          <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-red-400">{summary.veryHardSentences}</div>
+            <div className="text-xs text-red-300">very hard to read</div>
           </div>
         )}
         {summary.hardSentences > 0 && (
-          <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-amber-700">{summary.hardSentences}</div>
-            <div className="text-xs text-amber-600">hard to read</div>
+          <div className="rounded-lg bg-amber-950 border border-amber-800 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-amber-400">{summary.hardSentences}</div>
+            <div className="text-xs text-amber-300">hard to read</div>
           </div>
         )}
         {summary.adverbs > 0 && (
-          <div className="rounded-lg bg-blue-100 border border-blue-200 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-blue-700">{summary.adverbs}</div>
-            <div className="text-xs text-blue-600">adverb{summary.adverbs !== 1 ? "s" : ""}</div>
+          <div className="rounded-lg bg-sky-950 border border-sky-800 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-sky-400">{summary.adverbs}</div>
+            <div className="text-xs text-sky-300">adverb{summary.adverbs !== 1 ? "s" : ""}</div>
           </div>
         )}
         {summary.passiveVoice > 0 && (
-          <div className="rounded-lg bg-green-100 border border-green-200 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-green-700">{summary.passiveVoice}</div>
-            <div className="text-xs text-green-600">passive voice</div>
+          <div className="rounded-lg bg-green-950 border border-green-800 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-green-400">{summary.passiveVoice}</div>
+            <div className="text-xs text-green-300">passive voice</div>
           </div>
         )}
         {summary.complexWords > 0 && (
-          <div className="rounded-lg bg-purple-100 border border-purple-200 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-purple-700">{summary.complexWords}</div>
-            <div className="text-xs text-purple-600">simpler alternative{summary.complexWords !== 1 ? "s" : ""}</div>
+          <div className="rounded-lg bg-purple-950 border border-purple-800 px-3 py-2 text-center">
+            <div className="text-lg font-bold text-purple-400">{summary.complexWords}</div>
+            <div className="text-xs text-purple-300">simpler alternative{summary.complexWords !== 1 ? "s" : ""}</div>
           </div>
         )}
         {summary.veryHardSentences === 0 &&
@@ -107,35 +107,35 @@ function HemingwayDisplay({ result }: { result: HemingwayResult }) {
           summary.adverbs === 0 &&
           summary.passiveVoice === 0 &&
           summary.complexWords === 0 && (
-            <div className="col-span-full rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 text-center">
-              <div className="text-sm font-semibold text-emerald-700">Looking good! No major issues found.</div>
+            <div className="col-span-full rounded-lg bg-emerald-950 border border-emerald-800 px-3 py-2 text-center">
+              <div className="text-sm font-semibold text-emerald-400">Looking good! No major issues found.</div>
             </div>
           )}
       </div>
 
       {/* Highlighted text */}
-      <div className="rounded-lg bg-white border border-blue-100 px-5 py-4 text-base leading-relaxed">
+      <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
         {sentences.map((s: SentenceAnalysis, i: number) => (
           <SentenceSpan key={i} sentence={s} />
         ))}
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-red-200" /> Very hard sentence
+          <span className="inline-block w-3 h-3 rounded bg-red-800" /> Very hard sentence
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-amber-200" /> Hard sentence
+          <span className="inline-block w-3 h-3 rounded bg-amber-800" /> Hard sentence
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-blue-300" /> Adverb
+          <span className="inline-block w-3 h-3 rounded-full bg-sky-600" /> Adverb
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-green-300" /> Passive voice
+          <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Passive voice
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-purple-300" /> Simpler alternative
+          <span className="inline-block w-3 h-3 rounded-full bg-purple-600" /> Simpler alternative
         </span>
       </div>
     </div>
@@ -145,9 +145,9 @@ function HemingwayDisplay({ result }: { result: HemingwayResult }) {
 function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
   const bgClass =
     sentence.level === "very-hard"
-      ? "bg-red-200"
+      ? "bg-red-900/50"
       : sentence.level === "hard"
-      ? "bg-amber-200"
+      ? "bg-amber-900/50"
       : "";
 
   // Build highlighted text with inline issue markers
@@ -165,10 +165,10 @@ function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
         if (issue) {
           const color =
             issue.type === "adverb"
-              ? "bg-blue-200 underline decoration-blue-400"
+              ? "bg-sky-800 underline decoration-sky-400"
               : issue.type === "passive"
-              ? "bg-green-200 underline decoration-green-400"
-              : "bg-purple-200 underline decoration-purple-400";
+              ? "bg-green-800 underline decoration-green-400"
+              : "bg-purple-800 underline decoration-purple-400";
           return (
             <span
               key={i}
@@ -335,16 +335,16 @@ export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center justify-start bg-[var(--background)]">
       {/* Header */}
-      <header className="w-full border-b border-zinc-200 bg-white">
+      <header className="w-full border-b border-slate-700 bg-slate-900">
         <div className="mx-auto max-w-3xl px-6 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Shorterrr<span className="text-red-500">!</span>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">
+            Shorterrr<span className="text-teal-400">!</span>
           </h1>
           <div className="flex items-center gap-3">
             {ready && !authenticated && (
               <button
                 onClick={login}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+                className="rounded-lg border border-slate-600 px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
               >
                 Sign in
               </button>
@@ -352,21 +352,21 @@ export default function Home() {
             {ready && authenticated && (
               <div className="flex items-center gap-2">
                 {embeddedWallet ? (
-                  <span className="text-xs text-emerald-600 font-mono hidden sm:inline">
+                  <span className="text-xs text-teal-400 font-mono hidden sm:inline">
                     Wallet: {embeddedWallet.address.slice(0, 6)}...
                     {embeddedWallet.address.slice(-4)}
                   </span>
                 ) : !walletsReady ? (
-                  <span className="text-xs text-zinc-400 animate-pulse">
+                  <span className="text-xs text-slate-500 animate-pulse">
                     Loading...
                   </span>
                 ) : null}
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-slate-400">
                   {user?.email?.address || "Connected"}
                 </span>
                 <button
                   onClick={logout}
-                  className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:bg-zinc-50 transition-colors"
+                  className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 transition-colors"
                 >
                   Sign out
                 </button>
@@ -379,7 +379,7 @@ export default function Home() {
       {/* Main */}
       <main className="w-full max-w-3xl px-6 py-10 flex flex-col gap-8">
         {/* Mode toggle */}
-        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-zinc-100 p-1 self-start">
+        <div className="flex flex-wrap items-center gap-1 rounded-lg bg-slate-800 p-1 self-start">
           {(Object.keys(MODE_CONFIG) as Mode[]).map((m) => (
             <button
               key={m}
@@ -394,8 +394,8 @@ export default function Home() {
               }}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 mode === m
-                  ? "bg-white text-zinc-900 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-700"
+                  ? "bg-slate-700 text-slate-100 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {MODE_CONFIG[m].label}
@@ -403,34 +403,34 @@ export default function Home() {
           ))}
         </div>
 
-        <p className="text-xs text-zinc-400 -mt-4">{config.description}</p>
+        <p className="text-xs text-slate-500 -mt-4">{config.description}</p>
 
         {/* Input section */}
         <section>
           <label
             htmlFor="draft"
-            className="block text-sm font-medium text-zinc-700 mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             Your draft message to your manager
           </label>
           <textarea
             id="draft"
             rows={8}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 placeholder-zinc-400 shadow-sm focus:border-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-200 resize-y"
+            className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 placeholder-slate-500 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/25 resize-y"
             placeholder='Paste your message here... e.g. "Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should..."'
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={loading}
           />
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-zinc-400">
+            <span className="text-xs text-slate-500">
               {wordCount} word{wordCount !== 1 ? "s" : ""}
             </span>
             <div className="flex gap-3">
               {(draft || shortened || hemingwayResult) && (
                 <button
                   onClick={handleReset}
-                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+                  className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 transition-colors"
                 >
                   Start over
                 </button>
@@ -439,7 +439,7 @@ export default function Home() {
                 <button
                   onClick={handleShorten}
                   disabled={!draft.trim() || loading}
-                  className="rounded-lg bg-red-500 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? "Working..." : config.buttonText}
                 </button>
@@ -451,11 +451,11 @@ export default function Home() {
         {/* SHORTER! shout (not for hemingway — it auto-analyzes) */}
         {hasShouted && mode !== "hemingway" && (
           <div className="flex flex-col items-center gap-2">
-            <div className="text-6xl font-black tracking-tighter text-red-500 select-none">
+            <div className="text-6xl font-black tracking-tighter text-teal-400 select-none">
               {mode === "joe" ? "SHORTER!" : "THE POET SPEAKS:"}
             </div>
             {loading && (
-              <p className="text-sm text-zinc-500 animate-pulse">
+              <p className="text-sm text-slate-400 animate-pulse">
                 {mode === "joe"
                   ? "Joe is rewriting your message..."
                   : "Composing riddles..."}
@@ -466,11 +466,11 @@ export default function Home() {
 
         {/* Payment required */}
         {pendingChallenge && (
-          <section className="rounded-xl border border-violet-200 bg-violet-50 p-6">
-            <h2 className="text-sm font-semibold text-violet-800 mb-2">
+          <section className="rounded-xl border border-violet-700 bg-violet-950 p-6">
+            <h2 className="text-sm font-semibold text-violet-300 mb-2">
               Payment Required (MPP)
             </h2>
-            <p className="text-sm text-violet-700 mb-1">{paymentStatus}</p>
+            <p className="text-sm text-violet-400 mb-1">{paymentStatus}</p>
             <p className="text-xs text-violet-500 mb-4">
               Method: {pendingChallenge.method} | Intent:{" "}
               {pendingChallenge.intent}
@@ -478,23 +478,23 @@ export default function Home() {
             {!authenticated ? (
               <button
                 onClick={login}
-                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 transition-colors"
+                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-500 transition-colors"
               >
                 Sign in to pay
               </button>
             ) : !walletsReady ? (
-              <p className="text-sm text-violet-600 animate-pulse">
+              <p className="text-sm text-violet-400 animate-pulse">
                 Loading wallet...
               </p>
             ) : !embeddedWallet ? (
-              <p className="text-sm text-violet-600">
+              <p className="text-sm text-violet-400">
                 Wallet not found. Try signing out and back in.
               </p>
             ) : (
               <button
                 onClick={handlePayAndRetry}
                 disabled={loading}
-                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-500 disabled:opacity-40 transition-colors"
               >
                 {loading ? "Processing..." : "Pay & continue"}
               </button>
@@ -504,14 +504,14 @@ export default function Home() {
 
         {/* Error */}
         {error && !pendingChallenge && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
         {/* Hemingway result (client-side analysis) */}
         {hemingwayResult && mode === "hemingway" && (
-          <section className="rounded-xl border border-blue-200 bg-blue-50 p-6">
+          <section className="rounded-xl border border-sky-800 bg-slate-900 p-6">
             <HemingwayDisplay result={hemingwayResult} />
           </section>
         )}
@@ -521,10 +521,10 @@ export default function Home() {
           <section
             className={`rounded-xl border p-6 ${
               ({
-                emerald: "border-emerald-200 bg-emerald-50",
-                amber: "border-amber-200 bg-amber-50",
-                purple: "border-purple-200 bg-purple-50",
-                blue: "border-blue-200 bg-blue-50",
+                emerald: "border-emerald-800 bg-emerald-950",
+                amber: "border-amber-800 bg-amber-950",
+                purple: "border-purple-800 bg-purple-950",
+                blue: "border-sky-800 bg-sky-950",
               })[c]
             }`}
           >
@@ -532,17 +532,17 @@ export default function Home() {
               <h2
                 className={`text-sm font-semibold ${
                   ({
-                    emerald: "text-emerald-800",
-                    amber: "text-amber-800",
-                    purple: "text-purple-800",
-                    blue: "text-blue-800",
+                    emerald: "text-emerald-300",
+                    amber: "text-amber-300",
+                    purple: "text-purple-300",
+                    blue: "text-sky-300",
                   })[c]
                 }`}
               >
                 {config.resultLabel}
               </h2>
               {mode === "joe" && shortenedWordCount > 0 && (
-                <span className="text-xs text-amber-600">
+                <span className="text-xs text-amber-400">
                   {shortenedWordCount} word
                   {shortenedWordCount !== 1 ? "s" : ""} (
                   {wordCount > 0
@@ -555,12 +555,12 @@ export default function Home() {
               )}
             </div>
             <div
-              className={`rounded-lg bg-white border px-4 py-3 text-base text-zinc-900 whitespace-pre-wrap ${
+              className={`rounded-lg bg-slate-800 border px-4 py-3 text-base text-slate-100 whitespace-pre-wrap ${
                 ({
-                  emerald: "border-emerald-100",
-                  amber: "border-amber-100",
-                  purple: "border-purple-100",
-                  blue: "border-blue-100",
+                  emerald: "border-emerald-800/50",
+                  amber: "border-amber-800/50",
+                  purple: "border-purple-800/50",
+                  blue: "border-sky-800/50",
                 })[c]
               }`}
             >
@@ -571,10 +571,10 @@ export default function Home() {
                 onClick={handleCopy}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
                   ({
-                    emerald: "bg-emerald-600 hover:bg-emerald-700",
-                    amber: "bg-amber-600 hover:bg-amber-700",
-                    purple: "bg-purple-600 hover:bg-purple-700",
-                    blue: "bg-blue-600 hover:bg-blue-700",
+                    emerald: "bg-emerald-600 hover:bg-emerald-500",
+                    amber: "bg-amber-600 hover:bg-amber-500",
+                    purple: "bg-purple-600 hover:bg-purple-500",
+                    blue: "bg-sky-600 hover:bg-sky-500",
                   })[c]
                 }`}
               >
@@ -584,7 +584,7 @@ export default function Home() {
                 <button
                   onClick={handleShorten}
                   disabled={loading}
-                  className="rounded-lg border border-amber-300 px-5 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                  className="rounded-lg border border-amber-700 px-5 py-2 text-sm font-medium text-amber-400 hover:bg-amber-900/50 transition-colors"
                 >
                   Even shorter!
                 </button>
@@ -615,15 +615,15 @@ export default function Home() {
             ].map((item) => (
               <div
                 key={item.step}
-                className="rounded-xl border border-zinc-200 bg-white p-5 text-center"
+                className="rounded-xl border border-slate-700 bg-slate-800 p-5 text-center"
               >
-                <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-500">
+                <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-teal-900 text-sm font-bold text-teal-400">
                   {item.step}
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-900">
+                <h3 className="text-sm font-semibold text-slate-200">
                   {item.title}
                 </h3>
-                <p className="mt-1 text-xs text-zinc-500">{item.desc}</p>
+                <p className="mt-1 text-xs text-slate-500">{item.desc}</p>
               </div>
             ))}
           </section>
@@ -631,12 +631,12 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto w-full border-t border-zinc-200 bg-white">
-        <div className="mx-auto max-w-3xl px-6 py-4 text-center text-xs text-zinc-400">
+      <footer className="mt-auto w-full border-t border-slate-700 bg-slate-900">
+        <div className="mx-auto max-w-3xl px-6 py-4 text-center text-xs text-slate-500">
           Shorterrr! &mdash; Powered by{" "}
           <a
             href="https://teenytiny.ai"
-            className="underline hover:text-zinc-600"
+            className="underline hover:text-slate-300"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -645,7 +645,7 @@ export default function Home() {
           ,{" "}
           <a
             href="https://anthropic.com"
-            className="underline hover:text-zinc-600"
+            className="underline hover:text-slate-300"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -654,7 +654,7 @@ export default function Home() {
           {" "}&amp;{" "}
           <a
             href="https://mpp.dev"
-            className="underline hover:text-zinc-600"
+            className="underline hover:text-slate-300"
             target="_blank"
             rel="noopener noreferrer"
           >
