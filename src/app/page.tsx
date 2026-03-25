@@ -9,6 +9,8 @@ import type { HemingwayResult, SentenceAnalysis } from "@/lib/hemingway";
 
 type Mode = "joe" | "riddle" | "hemingway";
 
+const DEFAULT_DRAFT = `Hi Sarah, I just wanted to take a moment to reach out to you and let you know that after very careful consideration and an extremely extensive review of all of the various available options that were presented to us during last week's meeting, I have ultimately come to the conclusion that I believe we should probably seriously consider the possibility of potentially moving forward with the implementation of the new project management software system that was originally suggested by the IT department, assuming of course that the budget allows for it and that we can get the necessary approvals from all of the relevant stakeholders who would need to be involved in the decision-making process.`;
+
 const MODE_CONFIG: Record<
   Mode,
   { label: string; description: string; buttonText: string; resultLabel: string; color: string }
@@ -197,7 +199,7 @@ function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
 /* ------------------------------------------------------------------ */
 
 export default function Home() {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(DEFAULT_DRAFT);
   const [shortened, setShortened] = useState("");
   const [hemingwayResult, setHemingwayResult] = useState<HemingwayResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -420,6 +422,19 @@ export default function Home() {
             placeholder='Paste your message here... e.g. "Hi Sarah, I just wanted to reach out and let you know that after careful consideration and extensive review of all the available options, I believe we should..."'
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                if (mode === "hemingway") {
+                  if (draft.trim()) {
+                    setHemingwayResult(analyze(draft));
+                    setHasShouted(true);
+                  }
+                } else {
+                  handleShorten();
+                }
+              }
+            }}
             disabled={loading}
           />
           <div className="mt-2 flex items-center justify-between">
