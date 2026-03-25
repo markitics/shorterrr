@@ -3,9 +3,9 @@ import Providers from "@/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Shorterrr! — Make your message shorter",
+  title: "paygllm — LLM API proxy",
   description:
-    "Draft a message to your manager. Shorterrr! always shouts SHORTER and gives you a tighter version to send instead.",
+    "One API endpoint, every LLM. Drop-in OpenAI-compatible proxy for GPT, Claude, and more. No provider API keys needed.",
 };
 
 export default function RootLayout({
