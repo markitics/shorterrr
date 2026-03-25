@@ -11,6 +11,14 @@ type Mode = "joe" | "riddle" | "hemingway";
 
 const DEFAULT_DRAFT = `Hi Sarah, I just wanted to take a moment to reach out to you and let you know that after very careful consideration and an extremely extensive review of all of the various available options that were presented to us during last week's meeting, I have ultimately come to the conclusion that I believe we should probably seriously consider the possibility of potentially moving forward with the implementation of the new project management software system that was originally suggested by the IT department, assuming of course that the budget allows for it and that we can get the necessary approvals from all of the relevant stakeholders who would need to be involved in the decision-making process.`;
 
+const EXAMPLE_MESSAGES = [
+  `Dear Manager, I am writing this email to respectfully and humbly request that you would be so kind as to potentially consider the possibility of allowing me to perhaps take some time off from work on Friday afternoon, if it is not too terribly inconvenient for the team and if the workload situation allows for it, because I have a dentist appointment that was originally scheduled for next month but was then subsequently moved forward due to a cancellation that unexpectedly became available, and I was told by the receptionist that this particular time slot would not be available again for quite a long time. It is believed by me that my tasks can be completed before I leave.`,
+  `Hi team, I wanted to very quickly circle back and touch base regarding the extremely important matter that was previously discussed at great length during our last all-hands meeting, specifically pertaining to the ongoing situation with the office kitchen refrigerator, which has been repeatedly and consistently observed to be in a state of uncleanliness by multiple members of the staff on numerous separate occasions over the course of the past several weeks. I am fundamentally of the opinion that it is absolutely essential and critically important that we establish and implement a comprehensive and thoroughly detailed rotating schedule for the regular and consistent cleaning and maintenance of the aforementioned refrigerator going forward. The situation has been allowed to deteriorate for entirely too long and it is now generally felt by everyone that something needs to be urgently done about it.`,
+  `Hello everyone, I wanted to proactively communicate to all relevant parties that, upon careful reflection and thorough deliberation about the various aspects and considerations that are involved, I have arrived at the determination that the quarterly budget report that was expected to be finalized and submitted by the end of this current business week will unfortunately and regrettably need to be delayed by a period of approximately two to three additional business days, owing to the fact that several of the data sources that are critically needed for the completion of the analysis have not yet been made available to our department by the finance team, despite the fact that multiple reminder emails were already sent to them on previous occasions. I apologize profusely for any inconvenience this may cause.`,
+  `Dear colleagues, I am reaching out today to bring to your collective attention an issue that has been gradually and progressively becoming more and more problematic over the recent weeks and months. Specifically, I am referring to the fact that the conference room booking system, which was recently updated and modernized as part of the company-wide digital transformation initiative, appears to be experiencing a number of persistent and recurring technical difficulties that have been negatively impacting our team's ability to effectively and efficiently schedule and coordinate our various meetings and collaborative working sessions. It would be greatly appreciated if someone from the technical support department could kindly investigate this matter at their earliest possible convenience. I believe that the root cause is probably related to the server migration that was hastily performed last month.`,
+];
+
+
 const MODE_CONFIG: Record<
   Mode,
   { label: string; description: string; buttonText: string; resultLabel: string; color: string }
@@ -409,12 +417,27 @@ export default function Home() {
 
         {/* Input section */}
         <section>
-          <label
-            htmlFor="draft"
-            className="block text-sm font-medium text-slate-300 mb-2"
-          >
-            Your draft message to your manager
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label
+              htmlFor="draft"
+              className="text-sm font-medium text-slate-300"
+            >
+              Your draft message to your manager
+            </label>
+            <button
+              onClick={() => {
+                const msg = EXAMPLE_MESSAGES[Math.floor(Math.random() * EXAMPLE_MESSAGES.length)];
+                setDraft(msg);
+                setShortened("");
+                setHemingwayResult(null);
+                setError("");
+                setHasShouted(false);
+              }}
+              className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
+            >
+              Generate example message
+            </button>
+          </div>
           <textarea
             id="draft"
             rows={8}
