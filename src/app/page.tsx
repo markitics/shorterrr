@@ -52,7 +52,7 @@ const MODE_CONFIG: Record<
 
 // Severity order: most severe first
 const SEVERITY_ORDER: IssueCategory[] = [
-  "very-hard", "hard", "very", "complex", "passive", "adverb",
+  "very-hard", "hard", "very", "complex", "passive", "adverb", "hedging",
 ];
 
 const CATEGORY_META: Record<IssueCategory, { label: string; bg: string; border: string; text: string; accent: string; dot: string }> = {
@@ -62,6 +62,7 @@ const CATEGORY_META: Record<IssueCategory, { label: string; bg: string; border: 
   "complex":   { label: "simpler alternative", bg: "bg-purple-950", border: "border-purple-800", text: "text-purple-400", accent: "text-purple-300", dot: "bg-purple-600 rounded-full" },
   "passive":   { label: "passive voice",      bg: "bg-green-950", border: "border-green-800", text: "text-green-400", accent: "text-green-300", dot: "bg-green-600 rounded-full" },
   "adverb":    { label: "adverb",             bg: "bg-sky-950", border: "border-sky-800", text: "text-sky-400", accent: "text-sky-300", dot: "bg-sky-600 rounded-full" },
+  "hedging":   { label: "hedging",            bg: "bg-rose-950", border: "border-rose-800", text: "text-rose-400", accent: "text-rose-300", dot: "bg-rose-600 rounded-full" },
 };
 
 function getCategoryCount(summary: HemingwayResult["summary"], cat: IssueCategory): number {
@@ -72,6 +73,7 @@ function getCategoryCount(summary: HemingwayResult["summary"], cat: IssueCategor
     case "complex": return summary.complexWords;
     case "passive": return summary.passiveVoice;
     case "adverb": return summary.adverbs;
+    case "hedging": return summary.hedging;
   }
 }
 
@@ -249,10 +251,6 @@ function HemingwayDisplay({
 }
 
 function SentenceSpan({ sentence, dismissed }: { sentence: SentenceAnalysis; dismissed: Set<IssueCategory> }) {
-  const showSentenceHighlight =
-    (sentence.level === "very-hard" && !dismissed.has("very-hard")) ||
-    (sentence.level === "hard" && !dismissed.has("hard"));
-
   const bgClass =
     sentence.level === "very-hard" && !dismissed.has("very-hard")
       ? "bg-red-900/50"
@@ -260,42 +258,98 @@ function SentenceSpan({ sentence, dismissed }: { sentence: SentenceAnalysis; dis
       ? "bg-amber-900/50"
       : "";
 
-  const words = sentence.text.split(/(\s+)/);
-  const issueMap = new Map<string, SentenceAnalysis["issues"][0]>();
+  // Build a list of character ranges to highlight for hedging (multi-word)
+  const hedgingRanges: { start: number; end: number; issue: SentenceAnalysis["issues"][0] }[] = [];
+  const wordIssueMap = new Map<string, SentenceAnalysis["issues"][0]>();
+
   for (const issue of sentence.issues) {
-    if (!dismissed.has(issue.type as IssueCategory)) {
-      issueMap.set(issue.word.toLowerCase(), issue);
+    if (dismissed.has(issue.type as IssueCategory)) continue;
+    if (issue.type === "hedging") {
+      hedgingRanges.push({ start: issue.index, end: issue.index + issue.word.length, issue });
+    } else {
+      wordIssueMap.set(issue.word.toLowerCase(), issue);
     }
   }
 
+  function getIssueColor(issue: SentenceAnalysis["issues"][0]) {
+    switch (issue.type) {
+      case "adverb": return "bg-sky-800 underline decoration-sky-400";
+      case "passive": return "bg-green-800 underline decoration-green-400";
+      case "very": return "bg-orange-800 underline decoration-orange-400";
+      case "hedging": return "bg-rose-800 underline decoration-rose-400";
+      case "complex": return "bg-purple-800 underline decoration-purple-400";
+      default: return "bg-purple-800 underline decoration-purple-400";
+    }
+  }
+
+  function getIssueTitle(issue: SentenceAnalysis["issues"][0]) {
+    switch (issue.type) {
+      case "complex": return `Try "${issue.suggestion}" instead`;
+      case "adverb": return "Consider removing this adverb";
+      case "very": return "Delete 'very', or use a stronger adjective";
+      case "hedging": return "Be direct — remove hedging language";
+      case "passive": return "Consider using active voice";
+      default: return "";
+    }
+  }
+
+  // For hedging: we need character-level rendering. Build segments.
+  if (hedgingRanges.length > 0) {
+    // Sort ranges by start position
+    const sorted = [...hedgingRanges].sort((a, b) => a.start - b.start);
+    const segments: { text: string; issue?: SentenceAnalysis["issues"][0] }[] = [];
+    let pos = 0;
+    for (const range of sorted) {
+      if (range.start > pos) {
+        segments.push({ text: sentence.text.slice(pos, range.start) });
+      }
+      segments.push({ text: sentence.text.slice(range.start, range.end), issue: range.issue });
+      pos = range.end;
+    }
+    if (pos < sentence.text.length) {
+      segments.push({ text: sentence.text.slice(pos) });
+    }
+
+    return (
+      <span className={`${bgClass} rounded-sm`}>
+        {segments.map((seg, si) => {
+          if (seg.issue) {
+            return (
+              <span key={si} className={`${getIssueColor(seg.issue)} rounded-sm cursor-help`} title={getIssueTitle(seg.issue)}>
+                {seg.text}
+              </span>
+            );
+          }
+          // For non-hedging segments, still do word-level highlighting
+          const words = seg.text.split(/(\s+)/);
+          return words.map((w, wi) => {
+            const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
+            const issue = wordIssueMap.get(clean);
+            if (issue) {
+              return (
+                <span key={`${si}-${wi}`} className={`${getIssueColor(issue)} rounded-sm cursor-help`} title={getIssueTitle(issue)}>
+                  {w}
+                </span>
+              );
+            }
+            return <span key={`${si}-${wi}`}>{w}</span>;
+          });
+        })}
+        {" "}
+      </span>
+    );
+  }
+
+  // No hedging — simple word-by-word highlighting
+  const words = sentence.text.split(/(\s+)/);
   return (
     <span className={`${bgClass} rounded-sm`}>
       {words.map((w, i) => {
         const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
-        const issue = issueMap.get(clean);
+        const issue = wordIssueMap.get(clean);
         if (issue) {
-          const color =
-            issue.type === "adverb"
-              ? "bg-sky-800 underline decoration-sky-400"
-              : issue.type === "passive"
-              ? "bg-green-800 underline decoration-green-400"
-              : issue.type === "very"
-              ? "bg-orange-800 underline decoration-orange-400"
-              : "bg-purple-800 underline decoration-purple-400";
           return (
-            <span
-              key={i}
-              className={`${color} rounded-sm cursor-help`}
-              title={
-                issue.type === "complex"
-                  ? `Try "${issue.suggestion}" instead`
-                  : issue.type === "adverb"
-                  ? "Consider removing this adverb"
-                  : issue.type === "very"
-                  ? "Delete 'very', or use a stronger adjective"
-                  : "Consider using active voice"
-              }
-            >
+            <span key={i} className={`${getIssueColor(issue)} rounded-sm cursor-help`} title={getIssueTitle(issue)}>
               {w}
             </span>
           );
@@ -593,14 +647,20 @@ export default function Home() {
             )}
             {ready && authenticated && (
               <div className="flex items-center gap-2">
-                {embeddedWallet ? (
-                  <span className="text-xs text-teal-400 font-mono hidden sm:inline">
-                    Wallet: {embeddedWallet.address.slice(0, 6)}...
-                    {embeddedWallet.address.slice(-4)}
-                  </span>
+                {walletsReady && wallets.length > 0 ? (
+                  <div className="flex flex-col items-end gap-0.5">
+                    {wallets.map((w) => (
+                      <span key={w.address} className="text-xs font-mono text-teal-400">
+                        {w.address.slice(0, 6)}...{w.address.slice(-4)}
+                        <span className="text-slate-500 ml-1">
+                          ({w.walletClientType === "privy" ? "embedded" : w.walletClientType || "external"})
+                        </span>
+                      </span>
+                    ))}
+                  </div>
                 ) : !walletsReady ? (
                   <span className="text-xs text-slate-500 animate-pulse">
-                    Loading...
+                    Loading wallets...
                   </span>
                 ) : null}
                 <span className="text-xs text-slate-400">

@@ -148,6 +148,7 @@ const CATEGORY_INSTRUCTIONS: Record<string, string> = {
   "complex": "Replace complex/fancy words with simpler alternatives (e.g. 'utilize' → 'use', 'subsequently' → 'then', 'approximately' → 'about').",
   "passive": "Convert passive voice to active voice where possible (e.g. 'was done by me' → 'I did it').",
   "adverb": "Remove unnecessary adverbs (words ending in -ly like 'extremely', 'basically', 'actually'). Only remove them, don't replace with other filler.",
+  "hedging": "Remove hedging and cagey language. Delete phrases like 'I think', 'I believe', 'I feel', 'probably', 'perhaps', 'maybe', 'just wanted to', 'kind of', 'sort of', 'if that makes sense', 'I'm not sure but', 'it seems', 'potentially', 'to be honest'. Replace with direct, confident statements. For example: 'I think we should do X' → 'We should do X'.",
 };
 
 async function handleHemingwayFix(message: string, fixCategories: string[]): Promise<NextResponse> {

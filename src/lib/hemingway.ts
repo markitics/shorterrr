@@ -29,6 +29,7 @@ export interface HemingwayResult {
     passiveVoice: number;
     complexWords: number;
     veryUsage: number;
+    hedging: number;
   };
 }
 
@@ -40,13 +41,13 @@ export interface SentenceAnalysis {
 }
 
 export interface Issue {
-  type: "adverb" | "passive" | "complex" | "very";
+  type: "adverb" | "passive" | "complex" | "very" | "hedging";
   word: string;
   suggestion?: string;
   index: number; // character offset within sentence
 }
 
-export type IssueCategory = "very-hard" | "hard" | "very" | "complex" | "passive" | "adverb";
+export type IssueCategory = "very-hard" | "hard" | "very" | "complex" | "passive" | "adverb" | "hedging";
 
 /* ------------------------------------------------------------------ */
 /*  Complex word alternatives                                          */
@@ -195,6 +196,50 @@ function findPassiveVoice(words: string[]): string[] {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Hedging / cagey language detection                                 */
+/* ------------------------------------------------------------------ */
+
+const HEDGING_PHRASES = [
+  "i think", "i believe", "i feel", "i guess", "i suppose",
+  "i would say", "i would suggest", "i would think",
+  "in my opinion", "in my view",
+  "it seems", "it appears", "it would seem",
+  "probably", "perhaps", "maybe", "possibly",
+  "i'm not sure but", "i'm not sure, but", "im not sure but",
+  "not sure if", "not sure whether",
+  "to be honest", "to be frank", "honestly",
+  "just wanted to", "just wanted",
+  "kind of", "sort of",
+  "if that makes sense", "if that's okay",
+  "i might be wrong but", "i might be wrong, but",
+  "i could be wrong but", "i could be wrong, but",
+  "it could be", "it might be",
+  "potentially", "conceivably",
+  "if possible", "if it's not too much trouble",
+  "would it be possible",
+];
+
+function findHedging(sentence: string): { phrase: string; index: number }[] {
+  const lower = sentence.toLowerCase();
+  const found: { phrase: string; index: number }[] = [];
+  for (const phrase of HEDGING_PHRASES) {
+    let startPos = 0;
+    while (true) {
+      const idx = lower.indexOf(phrase, startPos);
+      if (idx === -1) break;
+      // Check word boundary: must not be in the middle of a larger word
+      const before = idx > 0 ? lower[idx - 1] : " ";
+      const after = idx + phrase.length < lower.length ? lower[idx + phrase.length] : " ";
+      if (/[\s,;.!?"'(\-]/.test(before) && /[\s,;.!?"')\-]/.test(after)) {
+        found.push({ phrase, index: idx });
+      }
+      startPos = idx + 1;
+    }
+  }
+  return found;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Sentence splitting                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -255,6 +300,7 @@ export function analyze(text: string): HemingwayResult {
         passiveVoice: 0,
         complexWords: 0,
         veryUsage: 0,
+        hedging: 0,
       },
     };
   }
@@ -268,6 +314,7 @@ export function analyze(text: string): HemingwayResult {
   let totalPassive = 0;
   let totalComplex = 0;
   let totalVery = 0;
+  let totalHedging = 0;
   let hardSentences = 0;
   let veryHardSentences = 0;
 
@@ -328,6 +375,18 @@ export function analyze(text: string): HemingwayResult {
       }
     });
 
+    // Check hedging / cagey language
+    const hedges = findHedging(sentence);
+    hedges.forEach(({ phrase, index }) => {
+      issues.push({
+        type: "hedging",
+        word: phrase,
+        suggestion: "Be direct — remove hedging language",
+        index,
+      });
+      totalHedging++;
+    });
+
     // Sentence difficulty
     let level: SentenceAnalysis["level"] = "ok";
     if (wc >= VERY_HARD_SENTENCE_WORDS) {
@@ -363,6 +422,7 @@ export function analyze(text: string): HemingwayResult {
       passiveVoice: totalPassive,
       complexWords: totalComplex,
       veryUsage: totalVery,
+      hedging: totalHedging,
     },
   };
 }
