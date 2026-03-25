@@ -248,11 +248,11 @@ export default function Home() {
     };
   }, [draft, mode]);
 
-  async function callApi(mppCredential?: string) {
+  async function callApi(mppCredential?: string, messageOverride?: string) {
     const res = await fetch("/api/shorten", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: draft, mode, mppCredential }),
+      body: JSON.stringify({ message: messageOverride || draft, mode, mppCredential }),
     });
 
     const data = await res.json();
@@ -275,8 +275,9 @@ export default function Home() {
     return data;
   }
 
-  async function handleShorten() {
-    if (!draft.trim()) return;
+  async function handleShorten(messageOverride?: string) {
+    const input = messageOverride || draft;
+    if (!input.trim()) return;
 
     // Hemingway auto-analyzes via debounce, no manual trigger needed
     if (mode === "hemingway") return;
@@ -290,7 +291,7 @@ export default function Home() {
     setPaymentStatus("");
 
     try {
-      const data = await callApi();
+      const data = await callApi(undefined, messageOverride);
       if (data) {
         setJoeResult(data);
       }
@@ -540,7 +541,7 @@ export default function Home() {
               )}
               {mode !== "hemingway" && (
                 <button
-                  onClick={handleShorten}
+                  onClick={() => handleShorten()}
                   disabled={!draft.trim() || loading}
                   className="rounded-lg bg-teal-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
@@ -678,7 +679,7 @@ export default function Home() {
                 {copied ? "Copied!" : "Copy"}
               </button>
               <button
-                onClick={handleShorten}
+                onClick={() => handleShorten(shortened)}
                 disabled={loading}
                 className="rounded-lg border border-amber-700 px-5 py-2 text-sm font-medium text-amber-400 hover:bg-amber-900/50 transition-colors"
               >
