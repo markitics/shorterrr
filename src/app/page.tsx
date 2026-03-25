@@ -209,6 +209,7 @@ function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
 export default function Home() {
   const [draft, setDraft] = useState(DEFAULT_DRAFT);
   const [shortened, setShortened] = useState("");
+  const [joeReaction, setJoeReaction] = useState("");
   const [hemingwayResult, setHemingwayResult] = useState<HemingwayResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -287,7 +288,7 @@ export default function Home() {
     try {
       const data = await callApi();
       if (data) {
-        setShortened(data.shortened);
+        setJoeResult(data);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error. Please try again.");
@@ -313,7 +314,7 @@ export default function Home() {
 
       const data = await callApi(credential);
       if (data) {
-        setShortened(data.shortened);
+        setJoeResult(data);
         setPendingChallenge(null);
         setPaymentStatus(data.receipt ? "Payment confirmed" : "");
       }
@@ -321,6 +322,25 @@ export default function Home() {
       setError(e instanceof Error ? e.message : "Payment failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function parseJoeResponse(text: string): { reaction: string; shorter: string } {
+    const joeMatch = text.match(/^JOE:\s*(.+?)(?:\n|$)/i);
+    const shorterMatch = text.match(/SHORTER VERSION:\s*\n?([\s\S]*)/i);
+    return {
+      reaction: joeMatch?.[1]?.trim() || "",
+      shorter: shorterMatch?.[1]?.trim() || text,
+    };
+  }
+
+  function setJoeResult(data: { shortened: string }) {
+    if (mode === "joe") {
+      const parsed = parseJoeResponse(data.shortened);
+      setJoeReaction(parsed.reaction);
+      setShortened(parsed.shorter);
+    } else {
+      setShortened(data.shortened);
     }
   }
 
@@ -333,6 +353,7 @@ export default function Home() {
   function handleReset() {
     setDraft("");
     setShortened("");
+    setJoeReaction("");
     setHemingwayResult(null);
     setError("");
     setHasShouted(false);
@@ -399,6 +420,7 @@ export default function Home() {
               onClick={() => {
                 setMode(m);
                 setShortened("");
+                setJoeReaction("");
                 setHemingwayResult(null);
                 setError("");
                 setHasShouted(false);
@@ -489,17 +511,42 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SHORTER! shout (not for hemingway — it auto-analyzes) */}
-        {hasShouted && mode !== "hemingway" && (
+        {/* SHORTER! shout — Joe mode gets speech bubble with avatar */}
+        {hasShouted && mode === "joe" && (
+          <div className="flex flex-col items-center gap-4">
+            {/* Speech bubble with SHORTER! */}
+            <div className="relative">
+              <div className="bg-teal-500 rounded-2xl px-8 py-4">
+                <div className="text-5xl sm:text-6xl font-black tracking-tighter text-slate-900 select-none">
+                  SHORTER!
+                </div>
+              </div>
+              {/* Triangle tail pointing down */}
+              <div className="absolute left-1/2 -translate-x-1/2 -bottom-3 w-0 h-0 border-l-[14px] border-r-[14px] border-t-[14px] border-l-transparent border-r-transparent border-t-teal-500" />
+            </div>
+            {/* Joe avatar */}
+            <img
+              src="/joe.svg"
+              alt="Joe"
+              className="w-16 h-16 rounded-full border-2 border-slate-600 object-cover"
+            />
+            {loading && (
+              <p className="text-sm text-slate-400 animate-pulse">
+                Joe is rewriting your message...
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Non-joe shout */}
+        {hasShouted && mode === "riddle" && (
           <div className="flex flex-col items-center gap-2">
             <div className="text-6xl font-black tracking-tighter text-teal-400 select-none">
-              {mode === "joe" ? "SHORTER!" : "THE POET SPEAKS:"}
+              THE POET SPEAKS:
             </div>
             {loading && (
               <p className="text-sm text-slate-400 animate-pulse">
-                {mode === "joe"
-                  ? "Joe is rewriting your message..."
-                  : "Composing riddles..."}
+                Composing riddles...
               </p>
             )}
           </div>
@@ -557,79 +604,66 @@ export default function Home() {
           </section>
         )}
 
-        {/* Result for non-hemingway modes */}
-        {shortened && mode !== "hemingway" && (
-          <section
-            className={`rounded-xl border p-6 ${
-              ({
-                emerald: "border-emerald-800 bg-emerald-950",
-                amber: "border-amber-800 bg-amber-950",
-                purple: "border-purple-800 bg-purple-950",
-                blue: "border-sky-800 bg-sky-950",
-              })[c]
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2
-                className={`text-sm font-semibold ${
-                  ({
-                    emerald: "text-emerald-300",
-                    amber: "text-amber-300",
-                    purple: "text-purple-300",
-                    blue: "text-sky-300",
-                  })[c]
-                }`}
-              >
-                {config.resultLabel}
-              </h2>
-              {mode === "joe" && shortenedWordCount > 0 && (
-                <span className="text-xs text-amber-400">
-                  {shortenedWordCount} word
-                  {shortenedWordCount !== 1 ? "s" : ""} (
-                  {wordCount > 0
-                    ? Math.round(
-                        ((wordCount - shortenedWordCount) / wordCount) * 100
-                      )
-                    : 0}
-                  % shorter)
-                </span>
-              )}
+        {/* Joe mode result — separated reaction + shorter version */}
+        {shortened && mode === "joe" && (
+          <section className="rounded-xl border border-amber-800 bg-amber-950 p-6 space-y-4">
+            {/* Joe's pithy reaction */}
+            {joeReaction && (
+              <div className="flex items-start gap-3">
+                <img src="/joe.svg" alt="Joe" className="w-8 h-8 rounded-full border border-amber-700 flex-shrink-0 mt-0.5 object-cover" />
+                <p className="text-amber-300 text-sm italic">{joeReaction}</p>
+              </div>
+            )}
+
+            {/* Shorter version */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-semibold text-amber-300">Shorter version</h2>
+                {shortenedWordCount > 0 && (
+                  <span className="text-xs text-amber-400">
+                    {shortenedWordCount} word{shortenedWordCount !== 1 ? "s" : ""} ({wordCount > 0 ? Math.round(((wordCount - shortenedWordCount) / wordCount) * 100) : 0}% shorter)
+                  </span>
+                )}
+              </div>
+              <div className="rounded-lg bg-slate-800 border border-amber-800/50 px-4 py-3 text-base text-slate-100 whitespace-pre-wrap">
+                {shortened}
+              </div>
             </div>
-            <div
-              className={`rounded-lg bg-slate-800 border px-4 py-3 text-base text-slate-100 whitespace-pre-wrap ${
-                ({
-                  emerald: "border-emerald-800/50",
-                  amber: "border-amber-800/50",
-                  purple: "border-purple-800/50",
-                  blue: "border-sky-800/50",
-                })[c]
-              }`}
-            >
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCopy}
+                className="rounded-lg bg-amber-600 hover:bg-amber-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+              <button
+                onClick={handleShorten}
+                disabled={loading}
+                className="rounded-lg border border-amber-700 px-5 py-2 text-sm font-medium text-amber-400 hover:bg-amber-900/50 transition-colors"
+              >
+                Even shorter!
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Result for riddle mode */}
+        {shortened && mode === "riddle" && (
+          <section className="rounded-xl border border-purple-800 bg-purple-950 p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-purple-300">{config.resultLabel}</h2>
+            </div>
+            <div className="rounded-lg bg-slate-800 border border-purple-800/50 px-4 py-3 text-base text-slate-100 whitespace-pre-wrap">
               {shortened}
             </div>
             <div className="mt-4 flex gap-3">
               <button
                 onClick={handleCopy}
-                className={`rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
-                  ({
-                    emerald: "bg-emerald-600 hover:bg-emerald-500",
-                    amber: "bg-amber-600 hover:bg-amber-500",
-                    purple: "bg-purple-600 hover:bg-purple-500",
-                    blue: "bg-sky-600 hover:bg-sky-500",
-                  })[c]
-                }`}
+                className="rounded-lg bg-purple-600 hover:bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors"
               >
                 {copied ? "Copied!" : "Copy"}
               </button>
-              {mode === "joe" && (
-                <button
-                  onClick={handleShorten}
-                  disabled={loading}
-                  className="rounded-lg border border-amber-700 px-5 py-2 text-sm font-medium text-amber-400 hover:bg-amber-900/50 transition-colors"
-                >
-                  Even shorter!
-                </button>
-              )}
             </div>
           </section>
         )}
