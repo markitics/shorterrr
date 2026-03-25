@@ -630,19 +630,15 @@ export default function Home() {
       )
     : [];
 
-  async function callHemingwayFix(categories: IssueCategory[]): Promise<string | null> {
-    const cacheKey = categories.sort().join(",");
-    if (sliderCache.current[cacheKey]) return sliderCache.current[cacheKey];
-
+  async function callHemingwayFix(categories: IssueCategory[], issueHints: string[]): Promise<string | null> {
     try {
       const res = await fetch("/api/shorten", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: draft, mode: "hemingway-fix", fixCategories: categories }),
+        body: JSON.stringify({ message: draft, mode: "hemingway-fix", fixCategories: categories, issueHints }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      sliderCache.current[cacheKey] = data.fixed;
       return data.fixed;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fix failed.");
@@ -651,12 +647,28 @@ export default function Home() {
   }
 
   async function handleAutoFix(cat: IssueCategory) {
+    if (!hemingwayResult) return;
     setFixingCategory(cat);
     setError("");
-    const fixed = await callHemingwayFix([cat]);
-    if (fixed) {
+
+    // Collect specific issue hints from the analysis so the AI knows exactly what to fix
+    const hints: string[] = [];
+    for (const s of hemingwayResult.sentences) {
+      if ((cat === "very-hard" && s.level === "very-hard") || (cat === "hard" && s.level === "hard")) {
+        hints.push(`Sentence (${s.wordCount} words): "${s.text}"`);
+      }
+      for (const issue of s.issues) {
+        if (issue.type === cat) {
+          hints.push(`"${issue.word}"${issue.suggestion ? ` → ${issue.suggestion}` : ""} in: "${s.text}"`);
+        }
+      }
+    }
+
+    const fixed = await callHemingwayFix([cat], hints);
+    if (fixed && fixed.trim() !== draft.trim()) {
       setDraft(fixed);
-      // Re-analyze with new text (will trigger via debounce)
+    } else if (fixed) {
+      setError("Could not fix this issue without rewriting. Try editing manually.");
     }
     setFixingCategory(null);
   }
@@ -682,7 +694,7 @@ export default function Home() {
     const categoriesToFix = activeCategories.slice(0, value);
     setSliderLoading(true);
     setError("");
-    const fixed = await callHemingwayFix(categoriesToFix);
+    const fixed = await callHemingwayFix(categoriesToFix, []);
     if (fixed) {
       setSliderText(fixed);
     }

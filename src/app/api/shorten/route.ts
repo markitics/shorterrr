@@ -152,7 +152,7 @@ const CATEGORY_INSTRUCTIONS: Record<string, string> = {
   "redundant": "Delete redundant throat-clearing phrases that add no meaning. Remove things like: 'I am writing to let you know that', 'I just wanted to reach out and', 'due to the fact that' (→ 'because'), 'in order to' (→ 'to'), 'at this point in time' (→ 'now'), 'it should be noted that', 'for the purpose of', 'in the event that' (→ 'if'), 'with regard to' (→ 'about'), 'on a daily basis' (→ 'daily'). Restructure sentences to be direct.",
 };
 
-async function handleHemingwayFix(message: string, fixCategories: string[]): Promise<NextResponse> {
+async function handleHemingwayFix(message: string, fixCategories: string[], issueHints: string[] = []): Promise<NextResponse> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -170,6 +170,10 @@ async function handleHemingwayFix(message: string, fixCategories: string[]): Pro
     return NextResponse.json({ fixed: message });
   }
 
+  const hintsBlock = issueHints.length > 0
+    ? `\n\nSpecific items to fix (ONLY fix these, nothing else):\n${issueHints.map(h => `• ${h}`).join("\n")}`
+    : "";
+
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -181,10 +185,19 @@ async function handleHemingwayFix(message: string, fixCategories: string[]): Pro
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2048,
-        system: `You are a precise text editor. Apply ONLY the requested fixes to the text below. Do NOT change anything else — preserve tone, meaning, structure, and formatting. Return ONLY the fixed text, no commentary or explanation.
+        system: `You are a MINIMAL text editor. Your job is to make the smallest possible change to fix ONLY the specific issues listed below.
 
-Fixes to apply:
-${instructions}`,
+CRITICAL RULES:
+1. Keep the ENTIRE text verbatim — every word, every comma, every sentence — EXCEPT for the specific items being fixed.
+2. Do NOT rephrase, reorganize, or "improve" any other part of the text.
+3. Do NOT fix issues in other categories (e.g. if asked to fix "very", do NOT also fix hedging or adverbs).
+4. For long sentences: just insert a period and capitalize the next word to split it. Do not reword.
+5. For word removals (adverbs, "very", hedging, redundant phrases): just delete the word/phrase. Do not rewrite the surrounding sentence.
+6. The output should be the original text with surgical deletions or minimal insertions — nothing else changed.
+7. Return ONLY the fixed text. No commentary, no explanation.
+
+Fix type:
+${instructions}${hintsBlock}`,
         messages: [
           {
             role: "user",
@@ -219,7 +232,7 @@ ${instructions}`,
 /* ------------------------------------------------------------------ */
 
 export async function POST(req: NextRequest) {
-  const { message, mode = "joe", mppCredential, fixCategories } = await req.json();
+  const { message, mode = "joe", mppCredential, fixCategories, issueHints } = await req.json();
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json(
@@ -239,7 +252,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     case "hemingway-fix":
-      return handleHemingwayFix(message, fixCategories || []);
+      return handleHemingwayFix(message, fixCategories || [], issueHints || []);
     default:
       return handleJoeMode(message);
   }
