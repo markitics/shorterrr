@@ -28,6 +28,7 @@ export interface HemingwayResult {
     adverbs: number;
     passiveVoice: number;
     complexWords: number;
+    veryUsage: number;
   };
 }
 
@@ -39,11 +40,13 @@ export interface SentenceAnalysis {
 }
 
 export interface Issue {
-  type: "adverb" | "passive" | "complex";
+  type: "adverb" | "passive" | "complex" | "very";
   word: string;
   suggestion?: string;
   index: number; // character offset within sentence
 }
+
+export type IssueCategory = "very-hard" | "hard" | "very" | "complex" | "passive" | "adverb";
 
 /* ------------------------------------------------------------------ */
 /*  Complex word alternatives                                          */
@@ -251,6 +254,7 @@ export function analyze(text: string): HemingwayResult {
         adverbs: 0,
         passiveVoice: 0,
         complexWords: 0,
+        veryUsage: 0,
       },
     };
   }
@@ -263,6 +267,7 @@ export function analyze(text: string): HemingwayResult {
   let totalAdverbs = 0;
   let totalPassive = 0;
   let totalComplex = 0;
+  let totalVery = 0;
   let hardSentences = 0;
   let veryHardSentences = 0;
 
@@ -309,6 +314,20 @@ export function analyze(text: string): HemingwayResult {
       }
     });
 
+    // Check "very" usage
+    words.forEach((w) => {
+      const clean = w.replace(/[^a-zA-Z]/g, "").toLowerCase();
+      if (clean === "very") {
+        issues.push({
+          type: "very",
+          word: clean,
+          suggestion: "delete 'very', or use a stronger adjective",
+          index: sentence.toLowerCase().indexOf(clean),
+        });
+        totalVery++;
+      }
+    });
+
     // Sentence difficulty
     let level: SentenceAnalysis["level"] = "ok";
     if (wc >= VERY_HARD_SENTENCE_WORDS) {
@@ -343,6 +362,7 @@ export function analyze(text: string): HemingwayResult {
       adverbs: totalAdverbs,
       passiveVoice: totalPassive,
       complexWords: totalComplex,
+      veryUsage: totalVery,
     },
   };
 }

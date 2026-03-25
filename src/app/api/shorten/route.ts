@@ -138,11 +138,86 @@ async function handleRiddleMode(message: string, mppCredential?: string): Promis
 }
 
 /* ------------------------------------------------------------------ */
+/*  Hemingway fix — AI-powered rewriting for specific issue categories  */
+/* ------------------------------------------------------------------ */
+
+const CATEGORY_INSTRUCTIONS: Record<string, string> = {
+  "very-hard": "Break up very long, hard-to-read sentences (20+ words) into shorter, clearer ones. Keep the meaning identical.",
+  "hard": "Simplify sentences that are somewhat hard to read (14-19 words) by making them more direct. Keep the meaning identical.",
+  "very": "Remove every instance of the word 'very'. Either delete it or replace 'very [adjective]' with a single stronger adjective (e.g. 'very big' → 'huge').",
+  "complex": "Replace complex/fancy words with simpler alternatives (e.g. 'utilize' → 'use', 'subsequently' → 'then', 'approximately' → 'about').",
+  "passive": "Convert passive voice to active voice where possible (e.g. 'was done by me' → 'I did it').",
+  "adverb": "Remove unnecessary adverbs (words ending in -ly like 'extremely', 'basically', 'actually'). Only remove them, don't replace with other filler.",
+};
+
+async function handleHemingwayFix(message: string, fixCategories: string[]): Promise<NextResponse> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "AI fixing is not available (missing API key)." },
+      { status: 500 }
+    );
+  }
+
+  const instructions = fixCategories
+    .filter((c) => CATEGORY_INSTRUCTIONS[c])
+    .map((c) => `- ${CATEGORY_INSTRUCTIONS[c]}`)
+    .join("\n");
+
+  if (!instructions) {
+    return NextResponse.json({ fixed: message });
+  }
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        system: `You are a precise text editor. Apply ONLY the requested fixes to the text below. Do NOT change anything else — preserve tone, meaning, structure, and formatting. Return ONLY the fixed text, no commentary or explanation.
+
+Fixes to apply:
+${instructions}`,
+        messages: [
+          {
+            role: "user",
+            content: message,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Anthropic API error:", response.status, await response.text());
+      return NextResponse.json(
+        { error: "AI fix failed. Try again." },
+        { status: 502 }
+      );
+    }
+
+    const data = await response.json();
+    const fixed = data.content?.[0]?.text ?? message;
+    return NextResponse.json({ fixed });
+  } catch (error) {
+    console.error("Error calling Anthropic API for hemingway fix:", error);
+    return NextResponse.json(
+      { error: "Could not reach AI. Please try again." },
+      { status: 500 }
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  POST handler                                                       */
 /* ------------------------------------------------------------------ */
 
 export async function POST(req: NextRequest) {
-  const { message, mode = "joe", mppCredential } = await req.json();
+  const { message, mode = "joe", mppCredential, fixCategories } = await req.json();
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json(
@@ -161,6 +236,8 @@ export async function POST(req: NextRequest) {
         { error: "Hemingway analysis runs client-side. No API call needed." },
         { status: 400 }
       );
+    case "hemingway-fix":
+      return handleHemingwayFix(message, fixCategories || []);
     default:
       return handleJoeMode(message);
   }

@@ -5,7 +5,7 @@ import { usePrivy, useWallets, getEmbeddedConnectedWallet } from "@privy-io/reac
 import { parseChallenge, encodeCredential, formatAmount } from "@/lib/mpp";
 import { analyze } from "@/lib/hemingway";
 import type { MppChallenge } from "@/lib/mpp";
-import type { HemingwayResult, SentenceAnalysis } from "@/lib/hemingway";
+import type { HemingwayResult, SentenceAnalysis, IssueCategory } from "@/lib/hemingway";
 
 type Mode = "joe" | "riddle" | "hemingway";
 
@@ -47,10 +47,63 @@ const MODE_CONFIG: Record<
 };
 
 /* ------------------------------------------------------------------ */
+/*  Hemingway constants & types                                        */
+/* ------------------------------------------------------------------ */
+
+// Severity order: most severe first
+const SEVERITY_ORDER: IssueCategory[] = [
+  "very-hard", "hard", "very", "complex", "passive", "adverb",
+];
+
+const CATEGORY_META: Record<IssueCategory, { label: string; bg: string; border: string; text: string; accent: string; dot: string }> = {
+  "very-hard": { label: "very hard to read", bg: "bg-red-950", border: "border-red-800", text: "text-red-400", accent: "text-red-300", dot: "bg-red-800 rounded" },
+  "hard":      { label: "hard to read",      bg: "bg-amber-950", border: "border-amber-800", text: "text-amber-400", accent: "text-amber-300", dot: "bg-amber-800 rounded" },
+  "very":      { label: "uses 'very'",        bg: "bg-orange-950", border: "border-orange-800", text: "text-orange-400", accent: "text-orange-300", dot: "bg-orange-600 rounded-full" },
+  "complex":   { label: "simpler alternative", bg: "bg-purple-950", border: "border-purple-800", text: "text-purple-400", accent: "text-purple-300", dot: "bg-purple-600 rounded-full" },
+  "passive":   { label: "passive voice",      bg: "bg-green-950", border: "border-green-800", text: "text-green-400", accent: "text-green-300", dot: "bg-green-600 rounded-full" },
+  "adverb":    { label: "adverb",             bg: "bg-sky-950", border: "border-sky-800", text: "text-sky-400", accent: "text-sky-300", dot: "bg-sky-600 rounded-full" },
+};
+
+function getCategoryCount(summary: HemingwayResult["summary"], cat: IssueCategory): number {
+  switch (cat) {
+    case "very-hard": return summary.veryHardSentences;
+    case "hard": return summary.hardSentences;
+    case "very": return summary.veryUsage;
+    case "complex": return summary.complexWords;
+    case "passive": return summary.passiveVoice;
+    case "adverb": return summary.adverbs;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Hemingway result display component                                 */
 /* ------------------------------------------------------------------ */
 
-function HemingwayDisplay({ result }: { result: HemingwayResult }) {
+function HemingwayDisplay({
+  result,
+  dismissed,
+  onDismiss,
+  onAutoFix,
+  fixingCategory,
+  sliderValue,
+  sliderMax,
+  onSliderChange,
+  sliderText,
+  sliderLoading,
+  originalText,
+}: {
+  result: HemingwayResult;
+  dismissed: Set<IssueCategory>;
+  onDismiss: (cat: IssueCategory) => void;
+  onAutoFix: (cat: IssueCategory) => void;
+  fixingCategory: IssueCategory | null;
+  sliderValue: number;
+  sliderMax: number;
+  onSliderChange: (v: number) => void;
+  sliderText: string | null;
+  sliderLoading: boolean;
+  originalText: string;
+}) {
   const { grade, stats, sentences, summary } = result;
 
   const gradeLabel =
@@ -61,6 +114,18 @@ function HemingwayDisplay({ result }: { result: HemingwayResult }) {
       : grade <= 10
       ? "text-amber-400"
       : "text-red-400";
+
+  // Categories that actually have issues (respecting dismissals)
+  const activeCategories = SEVERITY_ORDER.filter(
+    (cat) => getCategoryCount(summary, cat) > 0 && !dismissed.has(cat)
+  );
+
+  const allClean =
+    activeCategories.length === 0 &&
+    SEVERITY_ORDER.every((cat) => getCategoryCount(summary, cat) === 0 || dismissed.has(cat));
+
+  // Text to display: slider text if available, otherwise highlighted original
+  const displayText = sliderText;
 
   return (
     <div className="space-y-6">
@@ -80,91 +145,127 @@ function HemingwayDisplay({ result }: { result: HemingwayResult }) {
         </div>
       </div>
 
-      {/* Issue summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        {summary.veryHardSentences > 0 && (
-          <div className="rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-red-400">{summary.veryHardSentences}</div>
-            <div className="text-xs text-red-300">very hard to read</div>
-          </div>
-        )}
-        {summary.hardSentences > 0 && (
-          <div className="rounded-lg bg-amber-950 border border-amber-800 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-amber-400">{summary.hardSentences}</div>
-            <div className="text-xs text-amber-300">hard to read</div>
-          </div>
-        )}
-        {summary.adverbs > 0 && (
-          <div className="rounded-lg bg-sky-950 border border-sky-800 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-sky-400">{summary.adverbs}</div>
-            <div className="text-xs text-sky-300">adverb{summary.adverbs !== 1 ? "s" : ""}</div>
-          </div>
-        )}
-        {summary.passiveVoice > 0 && (
-          <div className="rounded-lg bg-green-950 border border-green-800 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-green-400">{summary.passiveVoice}</div>
-            <div className="text-xs text-green-300">passive voice</div>
-          </div>
-        )}
-        {summary.complexWords > 0 && (
-          <div className="rounded-lg bg-purple-950 border border-purple-800 px-3 py-2 text-center">
-            <div className="text-lg font-bold text-purple-400">{summary.complexWords}</div>
-            <div className="text-xs text-purple-300">simpler alternative{summary.complexWords !== 1 ? "s" : ""}</div>
-          </div>
-        )}
-        {summary.veryHardSentences === 0 &&
-          summary.hardSentences === 0 &&
-          summary.adverbs === 0 &&
-          summary.passiveVoice === 0 &&
-          summary.complexWords === 0 && (
-            <div className="col-span-full rounded-lg bg-emerald-950 border border-emerald-800 px-3 py-2 text-center">
-              <div className="text-sm font-semibold text-emerald-400">Looking good! No major issues found.</div>
+      {/* Issue summary cards with auto-fix / dismiss */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {SEVERITY_ORDER.map((cat) => {
+          const count = getCategoryCount(summary, cat);
+          if (count === 0) return null;
+          const meta = CATEGORY_META[cat];
+          const isDismissed = dismissed.has(cat);
+          const isFixing = fixingCategory === cat;
+
+          return (
+            <div
+              key={cat}
+              className={`rounded-lg ${meta.bg} ${meta.border} border px-3 py-2 flex items-center justify-between gap-2 ${isDismissed ? "opacity-40" : ""}`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`text-lg font-bold ${meta.text}`}>{count}</span>
+                <span className={`text-xs ${meta.accent} truncate`}>
+                  {meta.label}{cat !== "very" && count !== 1 ? "s" : ""}
+                </span>
+              </div>
+              {!isDismissed && (
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => onAutoFix(cat)}
+                    disabled={isFixing || sliderLoading}
+                    className={`rounded px-2 py-1 text-xs font-medium text-white transition-colors ${
+                      isFixing
+                        ? "bg-slate-600 cursor-wait"
+                        : "bg-teal-600 hover:bg-teal-500"
+                    }`}
+                  >
+                    {isFixing ? "Fixing..." : "Auto-fix"}
+                  </button>
+                  <button
+                    onClick={() => onDismiss(cat)}
+                    className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-600 hover:bg-slate-700 transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          );
+        })}
+        {allClean && (
+          <div className="col-span-full rounded-lg bg-emerald-950 border border-emerald-800 px-3 py-2 text-center">
+            <div className="text-sm font-semibold text-emerald-400">Looking good! No major issues found.</div>
+          </div>
+        )}
       </div>
 
-      {/* Highlighted text */}
-      <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
-        {sentences.map((s: SentenceAnalysis, i: number) => (
-          <SentenceSpan key={i} sentence={s} />
-        ))}
-      </div>
+      {/* Slider: Original ↔ Hemingway'd */}
+      {activeCategories.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Original</span>
+            <span>Hemingway&apos;d</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={sliderMax}
+            value={sliderValue}
+            onChange={(e) => onSliderChange(Number(e.target.value))}
+            disabled={sliderLoading}
+            className="w-full accent-teal-500 cursor-pointer disabled:opacity-50"
+          />
+          {sliderValue > 0 && sliderValue < sliderMax && (
+            <p className="text-xs text-slate-500 text-center">
+              Fixing: {activeCategories.slice(0, sliderValue).map((c) => CATEGORY_META[c].label).join(", ")}
+            </p>
+          )}
+          {sliderLoading && (
+            <p className="text-xs text-teal-400 text-center animate-pulse">Applying fixes...</p>
+          )}
+        </div>
+      )}
+
+      {/* Display text — slider result or highlighted original */}
+      {displayText ? (
+        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200 whitespace-pre-wrap">
+          {displayText}
+        </div>
+      ) : (
+        <div className="rounded-lg bg-slate-800 border border-slate-600 px-5 py-4 text-base leading-relaxed text-slate-200">
+          {sentences.map((s: SentenceAnalysis, i: number) => (
+            <SentenceSpan key={i} sentence={s} dismissed={dismissed} />
+          ))}
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-red-800" /> Very hard sentence
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-amber-800" /> Hard sentence
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-sky-600" /> Adverb
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-green-600" /> Passive voice
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-purple-600" /> Simpler alternative
-        </span>
+        {SEVERITY_ORDER.filter((cat) => getCategoryCount(summary, cat) > 0 && !dismissed.has(cat)).map((cat) => (
+          <span key={cat} className="flex items-center gap-1">
+            <span className={`inline-block w-3 h-3 ${CATEGORY_META[cat].dot}`} /> {CATEGORY_META[cat].label}
+          </span>
+        ))}
       </div>
     </div>
   );
 }
 
-function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
+function SentenceSpan({ sentence, dismissed }: { sentence: SentenceAnalysis; dismissed: Set<IssueCategory> }) {
+  const showSentenceHighlight =
+    (sentence.level === "very-hard" && !dismissed.has("very-hard")) ||
+    (sentence.level === "hard" && !dismissed.has("hard"));
+
   const bgClass =
-    sentence.level === "very-hard"
+    sentence.level === "very-hard" && !dismissed.has("very-hard")
       ? "bg-red-900/50"
-      : sentence.level === "hard"
+      : sentence.level === "hard" && !dismissed.has("hard")
       ? "bg-amber-900/50"
       : "";
 
-  // Build highlighted text with inline issue markers
   const words = sentence.text.split(/(\s+)/);
   const issueMap = new Map<string, SentenceAnalysis["issues"][0]>();
   for (const issue of sentence.issues) {
-    issueMap.set(issue.word.toLowerCase(), issue);
+    if (!dismissed.has(issue.type as IssueCategory)) {
+      issueMap.set(issue.word.toLowerCase(), issue);
+    }
   }
 
   return (
@@ -178,6 +279,8 @@ function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
               ? "bg-sky-800 underline decoration-sky-400"
               : issue.type === "passive"
               ? "bg-green-800 underline decoration-green-400"
+              : issue.type === "very"
+              ? "bg-orange-800 underline decoration-orange-400"
               : "bg-purple-800 underline decoration-purple-400";
           return (
             <span
@@ -188,6 +291,8 @@ function SentenceSpan({ sentence }: { sentence: SentenceAnalysis }) {
                   ? `Try "${issue.suggestion}" instead`
                   : issue.type === "adverb"
                   ? "Consider removing this adverb"
+                  : issue.type === "very"
+                  ? "Delete 'very', or use a stronger adjective"
                   : "Consider using active voice"
               }
             >
@@ -220,6 +325,14 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [undoSnapshot, setUndoSnapshot] = useState<{ draft: string; shortened: string; joeReaction: string; hemingwayResult: HemingwayResult | null; hasShouted: boolean } | null>(null);
 
+  // Hemingway auto-fix state
+  const [dismissedCategories, setDismissedCategories] = useState<Set<IssueCategory>>(new Set());
+  const [fixingCategory, setFixingCategory] = useState<IssueCategory | null>(null);
+  const [sliderValue, setSliderValue] = useState(0);
+  const [sliderText, setSliderText] = useState<string | null>(null);
+  const [sliderLoading, setSliderLoading] = useState(false);
+  const sliderCache = useRef<Record<string, string>>({});
+
   // Cache results per mode so toggling back restores them
   const resultCache = useRef<Record<string, { shortened: string; joeReaction: string; hemingwayResult: HemingwayResult | null; hasShouted: boolean; draft: string }>>({});
 
@@ -239,6 +352,11 @@ export default function Home() {
       setHasShouted(false);
       return;
     }
+    // Reset slider state when draft changes
+    setSliderValue(0);
+    setSliderText(null);
+    sliderCache.current = {};
+
     debounceRef.current = setTimeout(() => {
       setHemingwayResult(analyze(draft));
       setHasShouted(true);
@@ -365,6 +483,10 @@ export default function Home() {
     setHasShouted(false);
     setPendingChallenge(null);
     setPaymentStatus("");
+    setDismissedCategories(new Set());
+    setSliderValue(0);
+    setSliderText(null);
+    sliderCache.current = {};
   }
 
   function handleUndo() {
@@ -375,6 +497,64 @@ export default function Home() {
     setHemingwayResult(undoSnapshot.hemingwayResult);
     setHasShouted(undoSnapshot.hasShouted);
     setUndoSnapshot(null);
+  }
+
+  // Hemingway: active categories in severity order
+  const activeCategories = hemingwayResult
+    ? SEVERITY_ORDER.filter(
+        (cat) => getCategoryCount(hemingwayResult.summary, cat) > 0 && !dismissedCategories.has(cat)
+      )
+    : [];
+
+  async function callHemingwayFix(categories: IssueCategory[]): Promise<string | null> {
+    const cacheKey = categories.sort().join(",");
+    if (sliderCache.current[cacheKey]) return sliderCache.current[cacheKey];
+
+    try {
+      const res = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: draft, mode: "hemingway-fix", fixCategories: categories }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      sliderCache.current[cacheKey] = data.fixed;
+      return data.fixed;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fix failed.");
+      return null;
+    }
+  }
+
+  async function handleAutoFix(cat: IssueCategory) {
+    setFixingCategory(cat);
+    setError("");
+    const fixed = await callHemingwayFix([cat]);
+    if (fixed) {
+      setDraft(fixed);
+      // Re-analyze with new text (will trigger via debounce)
+    }
+    setFixingCategory(null);
+  }
+
+  function handleDismiss(cat: IssueCategory) {
+    setDismissedCategories((prev) => new Set([...prev, cat]));
+  }
+
+  async function handleSliderChange(value: number) {
+    setSliderValue(value);
+    if (value === 0) {
+      setSliderText(null);
+      return;
+    }
+    const categoriesToFix = activeCategories.slice(0, value);
+    setSliderLoading(true);
+    setError("");
+    const fixed = await callHemingwayFix(categoriesToFix);
+    if (fixed) {
+      setSliderText(fixed);
+    }
+    setSliderLoading(false);
   }
 
   // Cmd+Z to undo clear
@@ -641,7 +821,19 @@ export default function Home() {
         {/* Hemingway result (client-side analysis) */}
         {hemingwayResult && mode === "hemingway" && (
           <section className="rounded-xl border border-sky-800 bg-slate-900 p-6">
-            <HemingwayDisplay result={hemingwayResult} />
+            <HemingwayDisplay
+              result={hemingwayResult}
+              dismissed={dismissedCategories}
+              onDismiss={handleDismiss}
+              onAutoFix={handleAutoFix}
+              fixingCategory={fixingCategory}
+              sliderValue={sliderValue}
+              sliderMax={activeCategories.length}
+              onSliderChange={handleSliderChange}
+              sliderText={sliderText}
+              sliderLoading={sliderLoading}
+              originalText={draft}
+            />
           </section>
         )}
 
