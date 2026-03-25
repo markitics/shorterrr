@@ -218,6 +218,7 @@ export default function Home() {
   const [pendingChallenge, setPendingChallenge] = useState<MppChallenge | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<{ draft: string; shortened: string; joeReaction: string; hemingwayResult: HemingwayResult | null; hasShouted: boolean } | null>(null);
 
   const { login, ready, authenticated, user, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
@@ -351,6 +352,7 @@ export default function Home() {
   }
 
   function handleReset() {
+    setUndoSnapshot({ draft, shortened, joeReaction, hemingwayResult, hasShouted });
     setDraft("");
     setShortened("");
     setJoeReaction("");
@@ -360,6 +362,28 @@ export default function Home() {
     setPendingChallenge(null);
     setPaymentStatus("");
   }
+
+  function handleUndo() {
+    if (!undoSnapshot) return;
+    setDraft(undoSnapshot.draft);
+    setShortened(undoSnapshot.shortened);
+    setJoeReaction(undoSnapshot.joeReaction);
+    setHemingwayResult(undoSnapshot.hemingwayResult);
+    setHasShouted(undoSnapshot.hasShouted);
+    setUndoSnapshot(null);
+  }
+
+  // Cmd+Z to undo clear
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && undoSnapshot && !draft) {
+        e.preventDefault();
+        handleUndo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   const wordCount = draft.trim() ? draft.trim().split(/\s+/).length : 0;
   const shortenedWordCount = shortened.trim()
@@ -495,7 +519,7 @@ export default function Home() {
                   onClick={handleReset}
                   className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 transition-colors"
                 >
-                  Start over
+                  Start over: clear input
                 </button>
               )}
               {mode !== "hemingway" && (
