@@ -24,14 +24,14 @@ const MODE_CONFIG: Record<
   { label: string; description: string; buttonText: string; resultLabel: string; color: string }
 > = {
   joe: {
-    label: "Joe Mode",
+    label: "Joe mode",
     description: "Joe says it's too long — and gives you a shorter version (powered by Claude)",
     buttonText: "Make it shorter!",
     resultLabel: "Joe says:",
     color: "amber",
   },
   riddle: {
-    label: "Answer in Riddles",
+    label: "Answer in riddles",
     description: "A surreal poet interprets your message (powered by TeenyTiny AI's racter)",
     buttonText: "Get a riddle",
     resultLabel: "The poet speaks:",
@@ -1060,7 +1060,7 @@ export default function Home() {
               {
                 step: "2",
                 title: "Pick a mode",
-                desc: "Joe Mode, Riddles, or Hemingway — each gives different feedback.",
+                desc: "Joe mode, Riddles, or Hemingway — each gives different feedback.",
               },
               {
                 step: "3",
